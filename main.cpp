@@ -77,6 +77,7 @@ std::pair<
         std::set<std::string>
 > scan_elf(archive *a) {
     // TODO: stub.
+    return {{"a"}, {"b"}};
 }
 
 void process_data_tar_file(package &pkg, archive *a, archive_entry *e) {
