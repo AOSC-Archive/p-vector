@@ -159,7 +159,7 @@ void deb_package(const std::string &path) {
 int main() {
     try {
         deb_package("/home/lion/bash_4.4.12-0_amd64_debug.deb");
-    } catch (archive_corrupted &e) {
+    } catch (archive_corrupted &except) {
         std::cerr << "archive is corrupted." << std::endl;
     }
 }
