@@ -92,7 +92,7 @@ void process_data_tar_file(package &pkg, archive *a, archive_entry *e) {
             .gname = archive_entry_gname(e),
     };
     pkg.files.push_back(f);
-    if (f.type == AE_IFREG || test_elf_magic(a)) {
+    if (f.type == AE_IFREG && test_elf_magic(a)) {
         try {
             auto so_info = scan_elf(a);
             pkg.so_provides.merge(so_info.first);
@@ -114,7 +114,7 @@ void process_data_tar(package &pkg, archive *a) {
             if (archive_read_open_fd(tar, pipes[0], 4096) != ARCHIVE_OK) throw archive_corrupted();
             archive_entry *e;
             while (archive_read_next_header(tar, &e) == ARCHIVE_OK) {
-                process_data_tar_file(pkg, a, e);
+                process_data_tar_file(pkg, tar, e);
             }
             if (archive_errno(tar) != ARCHIVE_OK) throw archive_corrupted();
         } catch (archive_corrupted &except) {
