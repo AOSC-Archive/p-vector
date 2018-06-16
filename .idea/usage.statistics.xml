@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="FUSProjectUsageTrigger">
+    <session id="1727997937">
+      <usages-collector id="statistics.file.extensions.open">
+        <counts>
+          <entry key="cpp" value="2" />
+          <entry key="h" value="24" />
+          <entry key="p_vector (disassembly)" value="1" />
+          <entry key="tcc" value="4" />
+          <entry key="txt" value="1" />
+          <entry key="xml" value="1" />
+        </counts>
+      </usages-collector>
+      <usages-collector id="statistics.file.types.open">
+        <counts>
+          <entry key="CMakeLists.txt" value="1" />
+          <entry key="Disassembly" value="1" />
+          <entry key="ObjectiveC" value="30" />
+          <entry key="XML" value="1" />
+        </counts>
+      </usages-collector>
+      <usages-collector id="statistics.file.extensions.edit">
+        <counts>
+          <entry key="cpp" value="4880" />
+          <entry key="h" value="936" />
+          <entry key="txt" value="57" />
+        </counts>
+      </usages-collector>
+      <usages-collector id="statistics.file.types.edit">
+        <counts>
+          <entry key="CMakeLists.txt" value="12" />
+          <entry key="ObjectiveC" value="5816" />
+          <entry key="PLAIN_TEXT" value="45" />
+        </counts>
+      </usages-collector>
+      <usages-collector id="statistics.cidr.testingFrameworks.usages" />
+    </session>
+  </component>
+</project>
