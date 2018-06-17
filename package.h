@@ -6,6 +6,7 @@
 #include <string>
 #include <stdexcept>
 #include <archive.h>
+#include <openssl/sha.h>
 
 #include "entry.h"
 
@@ -27,6 +28,8 @@ public:
     std::vector<file_entry> files;
     std::set<std::string> so_provides;
     std::set<std::string> so_depends;
+    off_t size;
+    unsigned char sha256[SHA256_DIGEST_LENGTH];
 
 private:
     archive *deb;
