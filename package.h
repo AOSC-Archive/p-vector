@@ -23,13 +23,13 @@ public:
 
     void scan(const std::string &path);
 
-    std::string control;
-    time_t mtime;
-    std::vector<file_entry> files;
-    std::set<std::string> so_provides;
-    std::set<std::string> so_depends;
-    off_t size;
-    unsigned char sha256[SHA256_DIGEST_LENGTH];
+    std::string control{};
+    time_t mtime{};
+    std::vector<file_entry> files{};
+    std::set<std::string> so_provides{};
+    std::set<std::string> so_depends{};
+    off_t size{};
+    unsigned char sha256[SHA256_DIGEST_LENGTH]{};
 
 private:
     archive *deb;
