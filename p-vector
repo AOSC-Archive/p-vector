@@ -1,0 +1,97 @@
+#!/bin/python3
+import os
+import re
+import sys
+
+import pymongo
+
+sys.path.append(os.path.dirname(__file__) + '/../libexec/p-vector')
+
+
+def split_soname(s: str):
+    r = re.compile('\.so(?!=[$.])')
+    pos = r.search(s)
+    if pos is None:
+        return {'name': s, 'ver': ''}
+    return {'name': s[:pos.end()], 'ver': s[pos.end():]}
+
+
+def doc_deb(p):
+    files_fix = [{field[0].name: field[1] for field in f.ListFields()} for f in p.p.files]
+    for i in files_fix:
+        i['path'] = os.path.normpath(os.path.join('/', i['path']))
+        i['base'] = os.path.basename(i['path'])
+    return {
+        'hash': p.p.hash_value,
+        'pkg': {
+            'name': p.control['Package'],
+            'ver': p.control['Version'],
+            'arch': p.control['Architecture'],
+        },
+        'deb': {
+            'path': p.filename,
+            'time': p.p.time,
+            'size': p.p.size,
+        },
+        'control': p.control,
+        'relation': p.control.relations,
+        'files': files_fix,
+        'so_provides': [split_soname(i) for i in p.p.so_provides],
+        'so_depends': [split_soname(i) for i in p.p.so_depends],
+        'mtime_ns': p.mtime_ns
+    }
+
+
+def scan_deb(path, collection: pymongo.collection):
+    st = os.stat(path)
+    mtime_ns = st.st_mtime_ns
+    size = st.st_size
+    old_file = collection.find_one({'deb.path': path})
+
+    if old_file is not None and old_file['deb']['size'] == size and old_file['mtime_ns'] == mtime_ns:
+        '''
+        Suppose there are no changes if it has:
+        * the same path (unique);
+        * the same size;
+        * the same modify time.
+        
+        We will not try to calculate hash now because it is too costly.
+        '''
+        return
+
+    import pkgscan
+    p = pkgscan.scan(path)
+    p.filename = path
+    p.mtime_ns = mtime_ns
+    doc = doc_deb(p)
+    try:
+        if old_file is not None:
+            collection.replace_one({'deb.path': path}, doc)
+            print('U', path)
+        else:
+            collection.insert_one(doc)
+            print('A', path)
+    except pymongo.errors.DuplicateKeyError as e:
+        print('C', path, e, file=sys.stderr)
+
+
+def scan(path, collection: pymongo.collection):
+    import pathlib
+    search_path = pathlib.PosixPath(path)
+    for i in search_path.rglob('*.deb'):
+        if i.is_file():
+            scan_deb(str(i), collection)
+
+
+def main():
+    client = pymongo.MongoClient('localhost', 27017)
+    db = client['aosc-os']
+    collection = db['p_vector']
+    collection.create_index([('hash', pymongo.ASCENDING)], name='hash_unique', unique=True)
+    collection.create_index([('deb.path', pymongo.ASCENDING)], name='path_unique', unique=True)
+
+    scan('.', collection)
+
+
+if __name__ == '__main__':
+    main()

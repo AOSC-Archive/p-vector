@@ -3,22 +3,14 @@ project(p_vector)
 
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(LibArchive REQUIRED)
-find_package(OpenSSL REQUIRED)
+set(LIBEXEC_PATH "libexec/p-vector")
 
-add_executable(p_vector
-        main.cpp
-        utils.h
-        entry.h
-        package.cpp
-        package.h
-        elf_dependency.cpp
-        elf_dependency.h)
+add_subdirectory(proto)
+add_subdirectory(native)
 
-target_include_directories(p_vector PRIVATE
-        ${LibArchive_INCLUDE_DIRS}
-        ${OPENSSL_INCLUDE_DIR})
+add_dependencies(pkgscan_cli proto)
+add_dependencies(pkgscan_cli proto)
 
-target_link_libraries(p_vector
-        ${LibArchive_LIBRARIES}
-        ${OPENSSL_CRYPTO_LIBRARY})
+install(PROGRAMS p-vector DESTINATION bin)
+install(FILES pkgscan.py deb822.py
+        DESTINATION ${LIBEXEC_PATH})

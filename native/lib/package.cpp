@@ -1,11 +1,13 @@
 #include <thread>
 #include <archive_entry.h>
 #include <openssl/sha.h>
-#include <fcntl.h>
 
 #include "package.h"
-#include "utils.h"
 #include "elf_dependency.h"
+
+static bool begins_with(const std::string &str, const std::string &prefix) noexcept {
+    return str.compare(0, prefix.size(), prefix) == 0;
+}
 
 static bool entry_is(archive_entry *e, const std::string &str) noexcept {
     return begins_with(archive_entry_pathname(e), str);
@@ -29,6 +31,7 @@ int archive_read_open_nested(archive *a, archive *parent) {
 
 struct payload_hash_fd {
     int _fd;
+    off_t *size;
     SHA256_CTX *_ctx;
     unsigned char *_buf;
     unsigned char *result;
@@ -36,7 +39,6 @@ struct payload_hash_fd {
 
 static int close_hash_fd_cb(struct archive *, void *_client_data) {
     auto p = (payload_hash_fd *) _client_data;
-    close(p->_fd);
     SHA256_Final(p->result, p->_ctx);
     delete p->_ctx;
     delete[] p->_buf;
@@ -55,17 +57,16 @@ static la_ssize_t read_hash_fd_cb(struct archive *a, void *_client_data, const v
             archive_set_error(a, errno, "failed to read() on fd");
         } else {
             SHA256_Update(p->_ctx, p->_buf, size);
+            *p->size += size;
         }
         return size;
     }
 }
 
-int archive_read_open_hash(archive *a, const std::string &path, unsigned char *result) {
-    int fd = open(path.c_str(), O_CLOEXEC | O_RDONLY);
-    if (fd < 0) return ARCHIVE_FAILED;
+static int archive_read_open_hash(archive *a, const int fd, unsigned char *result, off_t *file_size) {
     auto ctx = new SHA256_CTX;
     SHA256_Init(ctx);
-    auto p = new payload_hash_fd{fd, ctx, new unsigned char[4096], result};
+    auto p = new payload_hash_fd{fd, file_size, ctx, new unsigned char[4096], result};
     return archive_read_open(a, p, dummy_cb, read_hash_fd_cb, close_hash_fd_cb);
 }
 
@@ -79,14 +80,8 @@ Package::~Package() noexcept {
     archive_read_free(this->deb);
 }
 
-void Package::scan(const std::string &path) {
-    std::cout << "Scanning " << path << std::endl;
-
-    struct stat st{};
-    if (stat(path.c_str(), &st) < 0) throw archive_corrupted();
-    this->size = st.st_size;
-
-    if (archive_read_open_hash(this->deb, path, this->sha256) != ARCHIVE_OK)
+void Package::scan(int fd) {
+    if (archive_read_open_hash(this->deb, fd, this->sha256, &this->size) != ARCHIVE_OK)
         throw archive_corrupted();
     archive_entry *e;
     while (archive_read_next_header(this->deb, &e) == ARCHIVE_OK) {
@@ -151,8 +146,8 @@ void Package::data_tar() {
 
 void Package::data_tar_file(archive *tar, archive_entry *e) {
     file_entry f = {
-            .path = dirname(archive_entry_pathname(e)),
-            .name = basename(archive_entry_pathname(e)),
+            .path = archive_entry_pathname(e),
+            .size = archive_entry_size(e),
             .is_dir = archive_entry_filetype(e) == AE_IFDIR,
             .type = archive_entry_filetype(e),
             .perm = archive_entry_perm(e),

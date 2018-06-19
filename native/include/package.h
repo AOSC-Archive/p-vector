@@ -7,12 +7,22 @@
 #include <stdexcept>
 #include <archive.h>
 #include <openssl/sha.h>
-
-#include "entry.h"
+#include <cstdint>
+#include <ctime>
 
 class archive_corrupted : public std::runtime_error {
 public:
     explicit archive_corrupted() : runtime_error("archive corrupted") {};
+};
+
+struct file_entry {
+    std::string path;
+    off_t size;
+    bool is_dir;
+    mode_t type;
+    mode_t perm;
+    std::int64_t uid, gid;
+    std::string uname, gname;
 };
 
 class Package {
@@ -21,10 +31,10 @@ public:
 
     ~Package() noexcept;
 
-    void scan(const std::string &path);
+    void scan(int fd);
 
     std::string control{};
-    time_t mtime{};
+    std::time_t mtime{};
     std::vector<file_entry> files{};
     std::set<std::string> so_provides{};
     std::set<std::string> so_depends{};
