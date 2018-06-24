@@ -19,7 +19,7 @@ void ElfDependency::must_seek(size_t target) {
     size_t distance = target - current;
     size_t blocks = distance / DISCARD_BLOCK_SIZE;
     size_t tail = distance % DISCARD_BLOCK_SIZE;
-    for (int i = 0; i < blocks; ++i) {
+    for (unsigned i = 0; i < blocks; ++i) {
         must_read(discard_buf, DISCARD_BLOCK_SIZE);
     }
     if (tail) must_read(discard_buf, tail);

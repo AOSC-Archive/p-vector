@@ -1,3 +1,6 @@
+add_definitions(-D_FILE_OFFSET_BITS=64)
+add_definitions(-Wall)
+
 configure_file(main.h.in main.h @ONLY)
 
 set_source_files_properties(
