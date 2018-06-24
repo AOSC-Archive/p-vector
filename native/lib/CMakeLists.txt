@@ -3,7 +3,8 @@ find_package(OpenSSL REQUIRED)
 
 add_library(pkgscan STATIC
         package.cpp
-        elf_dependency.cpp)
+        elf_dependency.cpp
+        package_archive_custom.cpp)
 
 target_include_directories(pkgscan PRIVATE
         ../include
