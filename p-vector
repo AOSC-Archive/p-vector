@@ -2,10 +2,17 @@
 import os
 import re
 import sys
+import threading
 
 import pymongo
+from pymongo.collection import Collection
+from pymongo.errors import DuplicateKeyError
 
-sys.path.append(os.path.dirname(__file__) + '/../libexec/p-vector')
+sys.path.insert(0, os.path.normpath(os.path.dirname(__file__) + '/../libexec/p-vector'))
+from print import *
+import pkgscan
+
+free_slots = threading.Semaphore(os.cpu_count() + 2)
 
 
 def split_soname(s: str):
@@ -16,13 +23,8 @@ def split_soname(s: str):
     return {'name': s[:pos.end()], 'ver': s[pos.end():]}
 
 
-def doc_deb(p):
-    files_fix = [{field[0].name: field[1] for field in f.ListFields()} for f in p.p.files]
-    for i in files_fix:
-        i['path'] = os.path.normpath(os.path.join('/', i['path']))
-        i['base'] = os.path.basename(i['path'])
-    return {
-        'hash': p.p.hash_value,
+def doc_from_pkgscan(p):
+    pkg_doc = {
         'pkg': {
             'name': p.control['Package'],
             'ver': p.control['Version'],
@@ -30,67 +32,263 @@ def doc_deb(p):
         },
         'deb': {
             'path': p.filename,
-            'time': p.p.time,
             'size': p.p.size,
+            'hash': p.p.hash_value,
+            'mtime': p.mtime_ns
         },
+        'time': p.p.time,
         'control': p.control,
         'relation': p.control.relations,
-        'files': files_fix,
         'so_provides': [split_soname(i) for i in p.p.so_provides],
         'so_depends': [split_soname(i) for i in p.p.so_depends],
-        'mtime_ns': p.mtime_ns
     }
 
+    file_doc = []
+    for f in p.p.files:
+        doc = {
+            'deb': p.p.hash_value,
+            'pkg': pkg_doc['pkg'],
+            'path': f.path,
+            'is_dir': f.is_dir,
+            'size': f.size,
+            'type': f.type,
+            'perm': f.perm,
+            'uid': f.uid,
+            'gid': f.gid,
+            'uname': f.uname,
+            'gname': f.gname,
+        }
+        doc['path'] = os.path.normpath(os.path.join('/', doc['path']))
+        doc['base'] = os.path.basename(doc['path'])
+        file_doc.append(doc)
+    return pkg_doc, file_doc
 
-def scan_deb(path, collection: pymongo.collection):
+
+def scan_deb(path, pkg_col: Collection, file_col: Collection):
     st = os.stat(path)
     mtime_ns = st.st_mtime_ns
     size = st.st_size
-    old_file = collection.find_one({'deb.path': path})
-
-    if old_file is not None and old_file['deb']['size'] == size and old_file['mtime_ns'] == mtime_ns:
-        '''
-        Suppose there are no changes if it has:
-        * the same path (unique);
-        * the same size;
-        * the same modify time.
-        
-        We will not try to calculate hash now because it is too costly.
-        '''
+    old_file = pkg_col.find_one({'deb.path': path})
+    '''
+    Suppose there are no changes if it has:
+    * the same path (unique);
+    * the same size;
+    * the same modify time.
+    
+    We will not try to calculate hash now because it is too costly.
+    '''
+    if old_file is not None and \
+            old_file['deb']['size'] == size and \
+            old_file['deb']['mtime'] == mtime_ns:
+        free_slots.release()
         return
 
-    import pkgscan
-    p = pkgscan.scan(path)
+    from subprocess import CalledProcessError
+    try:
+        p = pkgscan.scan(path)
+    except CalledProcessError:
+        free_slots.release()
+        E('SCAN', 'ERROR ', path, 'is corrupted')
+        return
+
     p.filename = path
     p.mtime_ns = mtime_ns
-    doc = doc_deb(p)
+    pkg_doc, file_doc = doc_from_pkgscan(p)
     try:
         if old_file is not None:
-            collection.replace_one({'deb.path': path}, doc)
-            print('U', path)
+            pkg_col.replace_one({'deb.path': path}, pkg_doc)
+            file_col.delete_many({'deb': p.p.hash_value})
+            file_col.insert_many(file_doc)
+            I('SCAN', 'UPDATE', path)
         else:
-            collection.insert_one(doc)
-            print('A', path)
-    except pymongo.errors.DuplicateKeyError as e:
-        print('C', path, e, file=sys.stderr)
+            pkg_col.insert_one(pkg_doc)
+            file_col.insert_many(file_doc)
+            I('SCAN', 'NEW   ', path)
+    except DuplicateKeyError:
+        dup_doc = pkg_col.find_one({'deb.hash': p.p.hash_value})
+        if dup_doc is not None:
+            E('SCAN', 'DUP   ', path, '<=>', dup_doc['deb']['path'])
+    free_slots.release()
 
 
-def scan(path, collection: pymongo.collection):
+def scan(path, pkg_col: Collection, file_col: Collection):
     import pathlib
     search_path = pathlib.PosixPath(path)
-    for i in search_path.rglob('*.deb'):
+    jobs = list(search_path.rglob('*.deb'))
+    jobs.sort()
+    for i in jobs:
         if i.is_file():
-            scan_deb(str(i), collection)
+            free_slots.acquire()
+            threading.Thread(target=scan_deb, args=(str(i), pkg_col, file_col)).start()
+
+
+def gen_pkg(pkg_col: Collection):
+    cur = pkg_col.find({}, {'_id': 0, 'pkg': 1, 'deb': 1, 'control': 1}).sort([('pkg', pymongo.ASCENDING)])
+    for i in cur:
+        i['control']['Filename'] = i['deb']['path']
+        i['control']['Size'] = str(i['deb']['size'])
+        from binascii import hexlify
+        i['control']['SHA256'] = hexlify(i['deb']['hash'])
+        import deb822
+        print(deb822.Deb822(i['control']))
+
+
+def file_check(pkg_col: Collection, file_col: Collection):
+    latest_pkgs = pkg_col.aggregate([
+
+        {'$sort': {'pkg': 1}},
+
+        {'$group': {  # Pick the first(latest) version of packages
+            '_id': '$pkg.name',
+            'pkg': {'$first': '$pkg'}
+        }},
+
+        {'$project': {
+            '_id': 0,
+            'pkg': 1
+        }},
+
+        {'$cout': 'p_vector_latest'}
+    ])
+    latest_pkgs = [i['pkg'] for i in latest_pkgs]
+
+    cur = file_col.aggregate([
+
+        {'$match': {'is_dir': None, 'pkg': {'$in': latest_pkgs}}},  # Exclude directories
+
+        {'$group': {  # Count packages that own the same file
+            '_id': '$path',
+            'count': {'$sum': 1},
+            'pkgs': {'$push': {
+                'name': '$pkg.name',
+                'ver': '$pkg.ver'
+            }}
+        }},
+
+        {'$match': {'count': {'$gt': 1}}},  # Pick the files which are contained in >1 packages
+
+        {'$group': {  # Pick the first file as sample for each package set
+            '_id': '$pkgs',
+            'count': {'$sum': 1},
+            'sample': {'$first': '$_id'}
+        }},
+
+    ], allowDiskUse=True)
+    for i in cur:
+        print(*[p['name'] + '@' + p['ver'] for p in i['_id']], end=': ')
+        print(i['sample'], end='')
+        if i['count'] == 1:
+            print()
+        else:
+            print(' and', i['count'], 'more')
+
+
+def elf_dep_check(pkg_col: Collection, file_col: Collection):
+    # latest_pkgs = pkg_col.aggregate([
+    #
+    #     {'$sort': {'pkg': 1}},
+    #
+    #     {'$group': {  # Pick the first(latest) version of packages
+    #         '_id': '$pkg.name',
+    #         'so_depends': {'$first': '$so_depends'},
+    #         'so_provides': {'$first': '$so_provides'}
+    #     }},
+    #
+    #     {'$group': {  # Pick the first(latest) version of packages
+    #         '_id': '$pkg.name',
+    #         'so_depends': {'$first': '$so_depends'},
+    #         'so_provides': {'$first': '$so_provides'}
+    #     }},
+    #
+    # ])
+
+    provides = pkg_col.aggregate([
+        {'$unwind': '$so_provides'},
+
+        {'$group': {  # Pick the first(latest) version of packages
+            '_id': '$so_provides',
+        }},
+    ])
+
+    provides = [i['_id'] for i in provides]
+
+    depends = pkg_col.aggregate([
+        {'$unwind': '$so_depends'},
+
+        {'$group': {  # Pick the first(latest) version of packages
+            '_id': '$so_depends',
+        }},
+    ])
+
+    depends = [i['_id'] for i in depends]
+
+    for d in depends:
+        found = False
+        for p in provides:
+            if p['name'] == d['name']:
+                found = True
+                break
+        if not found:
+            print(d)
+
+
+def gen_cnt(pkg_col: Collection, file_col: Collection):
+    latest_pkgs = pkg_col.aggregate([
+
+        {'$match': {  # Pick the first(latest) version of packages
+            'pkg.arch': 'amd64'
+        }},
+
+        {'$sort': {'pkg': 1}},
+
+        {'$group': {  # Pick the first(latest) version of packages
+            '_id': '$pkg.name',
+            'pkg': {'$first': '$pkg'}
+        }},
+
+        {'$project': {
+            '_id': 0,
+            'pkg': 1
+        }},
+    ], allowDiskUse=True)
+    latest_pkgs = [i['pkg'] for i in latest_pkgs]
+
+    cnt = file_col.aggregate([
+
+        {'$match': {'is_dir': None, 'pkg': {'$in': latest_pkgs}}},  # Exclude directories
+
+        {'$project': {
+            '_id': 0,
+            'pkg.name': 1,
+            'path': 1,
+        }},
+
+        {'$sort': {'path': 1}},
+
+    ], allowDiskUse=True)
+
+    for i in cnt:
+        path = i['path'][1:]
+        if path == '':
+            path = '/'
+        print(path, i['pkg']['name'])
 
 
 def main():
     client = pymongo.MongoClient('localhost', 27017)
     db = client['aosc-os']
-    collection = db['p_vector']
-    collection.create_index([('hash', pymongo.ASCENDING)], name='hash_unique', unique=True)
-    collection.create_index([('deb.path', pymongo.ASCENDING)], name='path_unique', unique=True)
+    pkg_col = db['p_vector']
+    pkg_col.create_index([('deb.hash', pymongo.ASCENDING)], name='hash_unique', unique=True)
+    pkg_col.create_index([('deb.path', pymongo.ASCENDING)], name='path_unique', unique=True)
+    pkg_col.create_index([('pkg', pymongo.ASCENDING)], name='pkg_ascending')
+    file_col = db['p_vector_files']
+    file_col.create_index([('path', pymongo.ASCENDING)], name='path_ascending')
+    file_col.create_index([('pkg', pymongo.ASCENDING)], name='pkg_ascending')
 
-    scan('.', collection)
+    # scan('.', pkg_col, file_col)
+    # gen_pkg(pkg_col)
+    gen_cnt(pkg_col, file_col)
+    # elf_dep_check(pkg_col, file_col)
 
 
 if __name__ == '__main__':

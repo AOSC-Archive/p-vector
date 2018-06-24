@@ -1,0 +1,3 @@
+file(GLOB PYTHON_FILES "*.py")
+install(FILES ${PYTHON_FILES}
+        DESTINATION ${LIBEXEC_PATH})

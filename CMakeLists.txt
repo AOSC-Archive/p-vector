@@ -7,10 +7,9 @@ set(LIBEXEC_PATH "libexec/p-vector")
 
 add_subdirectory(proto)
 add_subdirectory(native)
+add_subdirectory(python)
 
 add_dependencies(pkgscan_cli proto)
 add_dependencies(pkgscan_cli proto)
 
 install(PROGRAMS p-vector DESTINATION bin)
-install(FILES pkgscan.py deb822.py
-        DESTINATION ${LIBEXEC_PATH})

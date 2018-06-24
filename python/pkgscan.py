@@ -1,8 +1,7 @@
 import os
-import sys
 
-sys.path.append(os.path.dirname(__file__))
 from result_pb2 import pkg_info
+
 import deb822
 
 
@@ -19,7 +18,7 @@ class PkgInfoWrapper(object):
 def scan(path: str):
     import subprocess
     with open(path, 'rb') as f:
-        result = subprocess.check_output(os.path.dirname(__file__) + '/pkgscan_cli', stdin=f)
+        result = subprocess.check_output(os.path.dirname(__file__) + '/pkgscan_cli', stdin=f, stderr=subprocess.DEVNULL)
     p = pkg_info()
     p.ParseFromString(result)
     return PkgInfoWrapper(p)
