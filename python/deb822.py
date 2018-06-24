@@ -1000,6 +1000,8 @@ class PkgRelation(object):
                               ' relationship "%s", returning it raw' % raw)
                 return {'name': raw, 'version': None, 'arch': None}
 
+        if raw.strip() == '':
+            return []
         tl_deps = cls.__comma_sep_RE.split(raw.strip())  # top-level deps
         cnf = map(cls.__pipe_sep_RE.split, tl_deps)
         return [[parse_rel(or_dep) for or_dep in or_deps] for or_deps in cnf]
