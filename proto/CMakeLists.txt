@@ -1,6 +1,6 @@
 find_package(Protobuf REQUIRED)
 
-file(GLOB PROTO_FILES "*.proto")
+set(PROTO_FILES result.proto)
 
 protobuf_generate_cpp(PROTO_SOURCES PROTO_HEADERS ${PROTO_FILES})
 protobuf_generate_python(PROTO_PYFILE ${PROTO_FILES})
