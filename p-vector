@@ -11,7 +11,7 @@ from pymongo.collection import Collection
 
 sys.path.insert(0, os.path.normpath(os.path.dirname(__file__) + '/../libexec/p-vector'))
 from print import *
-import pkgscan
+import pkg_scan
 import dpkg_version
 
 REPO_DIR = '.'
@@ -34,7 +34,7 @@ def split_soname(s: str):
     return {'name': s[:pos.end()], 'ver': s[pos.end():]}
 
 
-def doc_from_pkgscan(p):
+def doc_from_pkg_scan(p):
     pkg_doc = {
         'pkg': {
             'name': p.control['Package'],
@@ -113,7 +113,7 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
         # Scan it.
         from subprocess import CalledProcessError
         try:
-            p = pkgscan.scan(deb_path)
+            p = pkg_scan.scan(deb_path)
         except CalledProcessError as e:
             if e.returncode not in [1, 2]:
                 raise
@@ -136,7 +136,7 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
             # Make a new document
             p.filename = deb_path
             p.mtime_ns = mtime_ns
-            pkg_doc, file_doc = doc_from_pkgscan(p)
+            pkg_doc, file_doc = doc_from_pkg_scan(p)
 
             same_file = pkg_col.find_one({'deb.path': deb_path}, {'_id': 0})
             if same_file is not None:
