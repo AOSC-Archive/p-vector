@@ -1,5 +1,7 @@
 add_definitions(-D_FILE_OFFSET_BITS=64)
 add_definitions(-Wall)
+add_definitions(-O3)
+add_definitions(-g1)
 
 configure_file(main.h.in main.h @ONLY)
 
