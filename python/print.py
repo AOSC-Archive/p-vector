@@ -36,4 +36,4 @@ def W(comp: str, *args):
 
 def _print(t: str, comp: str, *args):
     print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-          t, '[' + comp + ']', *args)
+          t, '[' + comp.ljust(5) + ']', *args)

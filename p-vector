@@ -1,5 +1,6 @@
 #!/bin/python3
 import os
+import pathlib
 import re
 import subprocess
 import sys
@@ -73,6 +74,49 @@ def doc_from_pkg_scan(p):
         doc['base'] = os.path.basename(doc['path'])
         file_doc.append(doc)
     return pkg_doc, file_doc
+
+
+def prune(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
+    delete_list = []
+    delete_old_list = []
+
+    cur = pkg_col.find()
+    total = cur.count()
+    count = 0
+    for i in cur:
+        if not pathlib.PosixPath(REPO_DIR).joinpath(i['deb']['path']).exists():
+            delete_list.append((i['deb']['path'], i['pkg']))
+        count += 1
+        progress_bar('Check current', count / total)
+
+    cur = pkg_old_col.find()
+    total = cur.count()
+    count = 0
+    for i in cur:
+        if not pathlib.PosixPath(REPO_DIR).joinpath(i['deb']['path']).exists():
+            delete_old_list.append(i['deb']['path'])
+        count += 1
+        progress_bar('Check archive', count / total)
+
+    total = len(delete_list)
+    count = 0
+    for i in delete_list:
+        I('CLEAN', 'CUR   ', i[0])
+        pkg_col.delete_many({'deb.path': i[0]})
+        file_col.delete_many({'pkg': i[1]})
+        count += 1
+        progress_bar('Prune current', count / total)
+
+    total = len(delete_old_list)
+    count = 0
+    for i in delete_old_list:
+        I('CLEAN', 'OLD   ', i)
+        pkg_old_col.delete_many({'deb.path': i})
+        count += 1
+        progress_bar('Prune archive', count / total)
+
+    progress_bar_end('Prune database')
+    return
 
 
 def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
@@ -185,7 +229,6 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
                 count += 1
                 progress_bar('Scan .deb', count / total)
 
-    import pathlib
     search_path = pathlib.PosixPath(REPO_DIR)
     jobs = list(search_path.rglob('*.deb'))
     jobs.sort()
@@ -392,12 +435,15 @@ def gen_release(pkg_col: Collection):
         sha256_file('Packages.xz'),
     ]
 
-    print(r)
+    print('Generate Release...')
     with open(REPO_DIR + '/Release', 'w', encoding='UTF-8') as f:
         print(r, file=f)
 
+    print('Sign Release...')
     subprocess.check_call(
         ['gpg', '--batch', '--yes', '--clearsign', '-o', REPO_DIR + '/InRelease', REPO_DIR + '/Release'])
+
+    print('Clean Release...')
     os.remove(REPO_DIR + '/Release')
 
 
@@ -419,6 +465,7 @@ def main():
     file_col.create_index([('pkg', pymongo.ASCENDING)], name='pkg_ascending')
 
     scan(pkg_col, pkg_old_col, file_col)
+    prune(pkg_col, pkg_old_col, file_col)
     gen_packages(pkg_col)
     gen_contents(pkg_col, file_col)
     gen_release(pkg_col)
