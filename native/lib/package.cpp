@@ -1,5 +1,6 @@
 #include <archive_entry.h>
 #include <libgen.h>
+#include <iostream>
 
 #include "package.h"
 #include "elf_dependency.h"
@@ -88,15 +89,14 @@ void Package::data_tar() {
     }
     archive_read_free(tar);
 
-
     std::set<std::string> short_names{};
     for (auto &long_name : this->so_provides) {
         if (short_names.find(long_name) != short_names.end()) continue;
         for (auto &short_name : this->so_provides) {
+            if (short_names.find(long_name) != short_names.end()) continue;
             if (short_name == long_name) continue;
             if (begins_with(long_name + '.', short_name + '.')) {
                 short_names.insert(short_name);
-                break;
             }
         }
     }

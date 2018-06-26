@@ -183,8 +183,7 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
             with counter_lock:
                 nonlocal count
                 count += 1
-                if count % 10 == 0:
-                    progress_bar('Scan .deb', count / total)
+                progress_bar('Scan .deb', count / total)
 
     import pathlib
     search_path = pathlib.PosixPath(REPO_DIR)
@@ -196,7 +195,7 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
     for i in jobs:
         if i.is_file():
             free_slots.acquire()
-            t = threading.Thread(target=containment_shell, args=(str(i)))
+            t = threading.Thread(target=containment_shell, args=[str(i)])
             thread_pool.append(t)
             t.start()
     for t in thread_pool:
@@ -240,21 +239,20 @@ def check_file_dup(file_col: Collection):
 
 def check_elf_dep(pkg_col: Collection):
     provides = pkg_col.aggregate([
+        {'$project': {'so_provides': 1}},  # Optimise for RAM
         {'$unwind': '$so_provides'},
-        {'$group': {
-            '_id': '$so_provides',
-        }},
+        {'$group': {'_id': '$so_provides'}},
     ])
     provides = [i['_id'] for i in provides]
     depends = pkg_col.aggregate([
+        {'$project': {'so_depends': 1}},
         {'$unwind': '$so_depends'},
-        {'$group': {  # Pick the first(latest) version of packages
-            '_id': '$so_depends',
-        }},
+        {'$group': {'_id': '$so_depends'}},
     ])
-    depends = [i['_id'] for i in depends]
     missing = []
-    for d in depends:
+    missing_name = []
+    for _d in depends:
+        d = _d['_id']
         found = False
         for p in provides:
             if p['name'] == d['name'] and (p['ver'] + '.').startswith(d['ver'] + '.'):
@@ -262,22 +260,61 @@ def check_elf_dep(pkg_col: Collection):
                 break
         if not found:
             missing.append(d)
-            print('Missing:', d['name'] + d['ver'])
-            likely_depends_on = pkg_col.aggregate([
-                {'$unwind': '$so_provides'},
-                {'$match': {'so_provides.name': d['name']}},
-                {'$group': {'_id': '$pkg.name', 'new_ver': {'$first': '$so_provides.ver'}}},
-            ])
-            print('Probably:', end='')
-            for likely in likely_depends_on:
-                print(' ' + d['name'] + likely['new_ver'] + '@' + likely['_id'], end='')
-            print()
-            broken_pkg = pkg_col.find({'so_depends': d})
-            print('Packages:', end='')
-            for pkg in broken_pkg:
-                print(' ' + pkg['pkg']['name'] + '=' + pkg['pkg']['ver'], end='')
-            print()
-            print()
+            missing_name.append(d['name'])
+
+    cur = pkg_col.aggregate([
+        {'$match': {'so_depends': {'$in': missing}}},
+        {'$project': {'_id': 0, 'pkg': 1, 'so_depends': 1}},
+        {'$unwind': '$so_depends'},
+        {'$match': {'so_depends': {'$in': missing}}},
+        {'$lookup': {
+            'from': 'pvector',
+            'localField': 'so_depends.name',
+            'foreignField': 'so_provides.name',
+            'as': 'probably'
+        }},
+        {'$project': {'pkg': 1, 'so_depends': 1, 'probably.pkg': 1, 'probably.so_provides': 1}},
+        {'$unwind': '$probably'},
+        {'$unwind': '$probably.so_provides'},
+        {'$match': {'probably.so_provides.name': {'$in': missing_name}}},
+        {'$group': {
+            '_id': {'$concat': ['$pkg.name', '(', '$pkg.ver', ')']},
+            'broken_dep': {'$addToSet': '$so_depends'},
+            'probably': {
+                '$addToSet': {
+                    'pkg': {'$concat': ['$probably.pkg.name', '(', '$probably.pkg.ver', ')']},
+                    'so_provides': '$probably.so_provides'
+                }
+            },
+        }},
+    ])
+
+    c = [i for i in cur]
+    print(len(c))
+    c.sort(key=lambda x: x['_id'])
+    for i in c:
+        pkg = i['_id']
+        broken = i['broken_dep']
+        probably = {}
+        for p in i['probably']:
+            for d in broken:
+                if p['so_provides']['name'] == d['name']:
+                    if p['pkg'] not in probably:
+                        probably[p['pkg']] = []
+                    probably[p['pkg']].append(p['so_provides']['name'] + p['so_provides']['ver'])
+                    break
+        print(pkg + ':')
+
+        broken = [b['name'] + b['ver'] for b in broken]
+        broken.sort()
+        print('  missing:', ', '.join(broken))
+
+        if len(probably) != 0:
+            print('  hints:')
+            for p in probably:
+                probably[p].sort()
+                print('    - ' + p + ' has ' + ', '.join(probably[p]))
+        print()
 
 
 def gen_packages(pkg_col: Collection):
@@ -381,11 +418,11 @@ def main():
     file_col.create_index([('path', pymongo.ASCENDING)], name='path_ascending')
     file_col.create_index([('pkg', pymongo.ASCENDING)], name='pkg_ascending')
 
-    # scan(pkg_col, pkg_old_col, file_col)
-    # gen_packages(pkg_col)
-    # gen_contents(pkg_col, file_col)
-    # gen_release(pkg_col)
-    check_elf_dep(pkg_col)
+    scan(pkg_col, pkg_old_col, file_col)
+    gen_packages(pkg_col)
+    gen_contents(pkg_col, file_col)
+    gen_release(pkg_col)
+    # check_elf_dep(pkg_col)
 
 
 if __name__ == '__main__':
