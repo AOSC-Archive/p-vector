@@ -1,4 +1,5 @@
 #include <archive_entry.h>
+#include <libgen.h>
 
 #include "package.h"
 #include "elf_dependency.h"
@@ -86,6 +87,39 @@ void Package::data_tar() {
         throw;
     }
     archive_read_free(tar);
+
+
+    std::set<std::string> short_names{};
+    for (auto &long_name : this->so_provides) {
+        if (short_names.find(long_name) != short_names.end()) continue;
+        for (auto &short_name : this->so_provides) {
+            if (short_name == long_name) continue;
+            if (begins_with(long_name + '.', short_name + '.')) {
+                short_names.insert(short_name);
+                break;
+            }
+        }
+    }
+    for (auto &short_name : short_names) {
+        this->so_provides.erase(short_name);
+    }
+
+    std::vector<std::string> self_resolved{};
+    for (auto &dep : this->so_depends) {
+        if (this->so_priv_provides.find(dep) != this->so_priv_provides.end())
+            self_resolved.push_back(dep);
+
+        for (auto &prv : this->so_priv_provides) {
+            if (begins_with(prv + '.', dep + '.')) {
+                self_resolved.push_back(dep);
+                break;
+            }
+        }
+    }
+    for (auto &dep : self_resolved) {
+        this->so_depends.erase(dep);
+    }
+
 }
 
 void Package::data_tar_file(archive *tar, archive_entry *e) {
@@ -102,6 +136,18 @@ void Package::data_tar_file(archive *tar, archive_entry *e) {
     };
     this->files.push_back(f);
 
+    bool smells_like_so = (begins_with(f.path, "./usr/lib") && !begins_with(f.path, "./usr/libexec"))
+                          || (begins_with(f.path, "./lib") && !begins_with(f.path, "./libexec"));
+
+    bool looks_like_so = (f.path + ".").find(".so.") != std::string::npos;
+
+    if (looks_like_so && smells_like_so && f.type == AE_IFLNK) {
+        // Well... A symbolic link? Alright, I accept this one.
+        this->so_provides.insert(basename((char *) f.path.c_str()));
+        // A symbolic link is never an ELF.
+        return;
+    }
+
     ElfDependency elf_dependency(
             [&](void *buf, size_t size) {
                 la_int64_t ret = archive_read_data(tar, buf, size);
@@ -111,10 +157,16 @@ void Package::data_tar_file(archive *tar, archive_entry *e) {
 
     try {
         elf_dependency.scan();
-    } catch (elf_corrupted &e) {}
+        if (elf_dependency.is_dyn) {
+            this->so_priv_provides.insert(elf_dependency.so_name);
+            this->so_priv_provides.insert(basename((char *) f.path.c_str()));
 
-    if (begins_with(f.path, "./usr/lib"))
-        this->so_provides.merge(elf_dependency.so_provides);
+            if (looks_like_so && smells_like_so) {
+                this->so_provides.insert(elf_dependency.so_name);
+                this->so_provides.insert(basename((char *) f.path.c_str()));
+            }
+        }
+    } catch (elf_corrupted &e) {}
 
     this->so_depends.merge(elf_dependency.so_depends);
 }

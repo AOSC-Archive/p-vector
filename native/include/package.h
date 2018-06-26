@@ -43,6 +43,7 @@ public:
 
 private:
     archive *deb;
+    std::set<std::string> so_priv_provides{};
 
     void control_tar();
 
