@@ -17,7 +17,8 @@ public:
 
     void scan();
 
-    std::set<std::string> so_provides;
+    bool is_dyn;
+    std::string so_name;
     std::set<std::string> so_depends;
 
 private:

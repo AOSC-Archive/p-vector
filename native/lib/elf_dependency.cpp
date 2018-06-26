@@ -71,6 +71,7 @@ void ElfDependency::scan() {
     // Get Ehdr
     _Ehdr ehdr{};
     must_read((char *) &ehdr + EI_NIDENT, sizeof(ehdr) - EI_NIDENT);
+    is_dyn = ehdr.e_type == ET_DYN;
 
     // Get Shdr
     must_seek(H(ehdr.e_shoff));
@@ -121,7 +122,7 @@ void ElfDependency::scan() {
         if (H(dyn.d_tag) == DT_NEEDED) {
             so_depends.insert({lookup_table(H(dyn.d_un.d_val))});
         } else if (H(dyn.d_tag) == DT_SONAME) {
-            so_provides.insert({lookup_table(H(dyn.d_un.d_val))});
+            so_name = lookup_table(H(dyn.d_un.d_val));
         }
     }
 }
