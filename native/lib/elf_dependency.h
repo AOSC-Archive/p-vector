@@ -22,10 +22,10 @@ public:
     std::set<std::string> so_depends;
 
 private:
-    template<class _Ehdr, class _Shdr, class _Dyn>
+    template<typename _Ehdr, typename _Shdr, typename _Dyn>
     void scan();
 
-    template<class T>
+    template<typename T>
     T H(T v) noexcept;
 
     void must_read(void *, size_t);

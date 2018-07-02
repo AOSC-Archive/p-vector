@@ -1,5 +1,6 @@
 #include <elf.h>
 #include <iostream>
+#include <cassert>
 
 #include "elf_dependency.h"
 
@@ -66,7 +67,7 @@ void ElfDependency::scan() {
     else throw elf_corrupted();
 }
 
-template<class _Ehdr, class _Shdr, class _Dyn>
+template<typename _Ehdr, typename _Shdr, typename _Dyn>
 void ElfDependency::scan() {
     // Get Ehdr
     _Ehdr ehdr{};
@@ -127,35 +128,32 @@ void ElfDependency::scan() {
     }
 }
 
-template<class T>
+template<typename T>
 T ElfDependency::H(T v) noexcept {
+    static_assert(
+            sizeof(T) == 8
+            || sizeof(T) == 4
+            || sizeof(T) == 2
+            || sizeof(T) == 1);
+
     if (endian == ELFDATA2MSB) {
-        switch (sizeof(T)) {
-            case 1:
-                return v;
-            case 2:
-                return be16toh(v);
-            case 4:
-                return be32toh(v);
-            case 8:
-                return be64toh(v);
-            default:
-                std::cerr << "malformed type" << std::endl;
-                exit(1);
-        }
+        if constexpr (sizeof(T) == 1)
+            return v;
+        else if constexpr (sizeof(T) == 2)
+            return be16toh(v);
+        else if constexpr (sizeof(T) == 4)
+            return be32toh(v);
+        else if constexpr (sizeof(T) == 8)
+            return be64toh(v);
     } else {
-        switch (sizeof(T)) {
-            case 1:
-                return v;
-            case 2:
-                return le16toh(v);
-            case 4:
-                return le32toh(v);
-            case 8:
-                return le64toh(v);
-            default:
-                std::cerr << "malformed type" << std::endl;
-                exit(1);
-        }
+        if constexpr (sizeof(T) == 1)
+            return v;
+        else if constexpr (sizeof(T) == 2)
+            return le16toh(v);
+        else if constexpr (sizeof(T) == 4)
+            return le32toh(v);
+        else if constexpr (sizeof(T) == 8)
+            return le64toh(v);
     }
+    assert(false);
 }
