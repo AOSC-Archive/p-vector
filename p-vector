@@ -126,14 +126,15 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
     count = 0
     total = 0
 
-    def scan_deb(deb_path):
-        st = os.stat(deb_path)
+    def scan_deb(rel_path: str):
+        deb_path = pathlib.PosixPath(REPO_DIR).joinpath(rel_path)
+        st = deb_path.stat()
         mtime_ns = st.st_mtime_ns
         size = st.st_size
 
         with db_lock:
-            same_file = pkg_col.find_one({'deb.path': deb_path}, {'_id': 0})
-            same_old_file = pkg_old_col.find_one({'deb.path': deb_path}, {'_id': 0})
+            same_file = pkg_col.find_one({'deb.path': rel_path}, {'_id': 0})
+            same_old_file = pkg_old_col.find_one({'deb.path': rel_path}, {'_id': 0})
 
         '''
         Suppose there are no changes if it has:
@@ -157,11 +158,11 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
         # Scan it.
         from subprocess import CalledProcessError
         try:
-            p = pkg_scan.scan(deb_path)
+            p = pkg_scan.scan(str(deb_path))
         except CalledProcessError as e:
             if e.returncode not in [1, 2]:
                 raise
-            E('SCAN', 'ERROR ', deb_path, 'is corrupted')
+            E('SCAN', 'ERROR ', rel_path, 'is corrupted')
             return
         finally:
             free_slots.release()
@@ -170,25 +171,25 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
             # Return if the same hash exists
             same_hash = pkg_old_col.find_one({'deb.hash': p.p.hash_value}, {'_id': 0})
             if same_hash is not None:
-                E('SCAN', 'DUP   ', deb_path, '<=>', same_hash['deb']['path'])
+                E('SCAN', 'DUP   ', rel_path, '<=>', same_hash['deb']['path'])
                 return
             same_hash = pkg_col.find_one({'deb.hash': p.p.hash_value}, {'_id': 0})
             if same_hash is not None:
-                E('SCAN', 'DUP   ', deb_path, '<=>', same_hash['deb']['path'])
+                E('SCAN', 'DUP   ', rel_path, '<=>', same_hash['deb']['path'])
                 return
 
             # Make a new document
-            p.filename = deb_path
+            p.filename = rel_path
             p.mtime_ns = mtime_ns
             pkg_doc, file_doc = doc_from_pkg_scan(p)
 
-            same_file = pkg_col.find_one({'deb.path': deb_path}, {'_id': 0})
+            same_file = pkg_col.find_one({'deb.path': rel_path}, {'_id': 0})
             if same_file is not None:
                 # if a document points to the same path exists, replace it
-                pkg_col.replace_one({'deb.path': deb_path}, pkg_doc)
+                pkg_col.replace_one({'deb.path': rel_path}, pkg_doc)
                 file_col.delete_many({'deb': p.p.hash_value})
                 file_col.insert_many(file_doc)
-                I('SCAN', 'UPDATE', deb_path)
+                I('SCAN', 'UPDATE', rel_path)
             else:
                 # if this is a new document
                 same_pkg = pkg_col.find_one({'pkg.name': pkg_doc['pkg']['name']}, {'_id': 0})
@@ -197,16 +198,16 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
                     r = dpkg_version.compare_ver(same_pkg['pkg']['ver'], pkg_doc['pkg']['ver'])
                     if r > 0:
                         # This one is earlier, we do nothing. We had better delete it.
-                        W('SCAN', 'OLD   ', deb_path, '<<', same_pkg['deb']['path'])
+                        W('SCAN', 'OLD   ', rel_path, '<<', same_pkg['deb']['path'])
                         pkg_old_col.replace_one({'pkg': pkg_doc['pkg']}, pkg_doc, upsert=True)
                     if r == 0:
                         # They have the same version, it's just not right
                         # (They have different paths, different hashes, but same versions?
                         # Package Manager cannot decide to use which one).
-                        E('SCAN', 'DUP   ', deb_path, '==', same_pkg['deb']['path'])
+                        E('SCAN', 'DUP   ', rel_path, '==', same_pkg['deb']['path'])
                     if r < 0:
                         # This one is newer, put the old one into archive, insert this one.
-                        I('SCAN', 'NEWER ', deb_path, '>>', same_pkg['deb']['path'])
+                        I('SCAN', 'NEWER ', rel_path, '>>', same_pkg['deb']['path'])
                         pkg_col.replace_one({'pkg.name': pkg_doc['pkg']['name']}, pkg_doc)
                         pkg_old_col.insert_one(same_pkg)
                         file_col.delete_many({'pkg': same_pkg['pkg']})
@@ -215,13 +216,13 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
                     # Completely new package
                     pkg_col.insert_one(pkg_doc)
                     file_col.insert_many(file_doc)
-                    I('SCAN', 'NEW   ', deb_path)
+                    I('SCAN', 'NEW   ', rel_path)
 
-    def containment_shell(deb_path):
+    def containment_shell(rel_path):
         try:
-            scan_deb(deb_path)
+            scan_deb(rel_path)
         except Exception:
-            print('ERROR', deb_path, file=sys.stderr)
+            print('ERROR', rel_path, file=sys.stderr)
             raise
         finally:
             with counter_lock:
@@ -238,7 +239,7 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
     for i in jobs:
         if i.is_file():
             free_slots.acquire()
-            t = threading.Thread(target=containment_shell, args=[str(i)])
+            t = threading.Thread(target=containment_shell, args=[str(i.relative_to(REPO_DIR))])
             thread_pool.append(t)
             t.start()
     for t in thread_pool:
@@ -449,26 +450,40 @@ def gen_release(pkg_col: Collection):
 
 def main():
     client = pymongo.MongoClient('localhost', 27017)
-    db = client['aosc-os']
+    origin = 'aosc-os'
+    import yaml
+    with open(origin + '.yml', 'rb') as f:
+        y = yaml.load_all(f)
+        db = client['p-vector_' + origin]
+        for i in y:
+            if i is None:
+                continue
 
-    pkg_col = db['pvector']
-    pkg_col.create_index([('deb.hash', pymongo.ASCENDING)], name='hash_unique', unique=True)
-    pkg_col.create_index([('deb.path', pymongo.ASCENDING)], name='path_unique', unique=True)
-    pkg_col.create_index([('pkg', pymongo.ASCENDING)], name='pkg_ascending', unique=True)
+            global REPO_DIR, OVERRIDE_RELEASE
+            REPO_DIR = i['path']
+            OVERRIDE_RELEASE = i['release']
+            repo_name = i['name']
+            print('====', repo_name, '====')
 
-    pkg_old_col = db['pvector_old']
-    pkg_old_col.create_index([('deb.hash', pymongo.ASCENDING)], name='hash_unique', unique=True)
-    pkg_old_col.create_index([('pkg', pymongo.ASCENDING)], name='pkg_ascending', unique=True)
+            pkg_col = db[repo_name]
+            pkg_col.create_index([('deb.hash', pymongo.ASCENDING)], name='hash_unique', unique=True)
+            pkg_col.create_index([('deb.path', pymongo.ASCENDING)], name='path_unique', unique=True)
+            pkg_col.create_index([('pkg', pymongo.ASCENDING)], name='pkg_ascending', unique=True)
 
-    file_col = db['pvector_files']
-    file_col.create_index([('path', pymongo.ASCENDING)], name='path_ascending')
-    file_col.create_index([('pkg', pymongo.ASCENDING)], name='pkg_ascending')
+            pkg_old_col = db[repo_name + '.old']
+            pkg_old_col.create_index([('deb.hash', pymongo.ASCENDING)], name='hash_unique', unique=True)
+            pkg_old_col.create_index([('pkg', pymongo.ASCENDING)], name='pkg_ascending', unique=True)
 
-    scan(pkg_col, pkg_old_col, file_col)
-    prune(pkg_col, pkg_old_col, file_col)
-    gen_packages(pkg_col)
-    gen_contents(pkg_col, file_col)
-    gen_release(pkg_col)
+            file_col = db[repo_name + '.files']
+            file_col.create_index([('path', pymongo.ASCENDING)], name='path_ascending')
+            file_col.create_index([('pkg', pymongo.ASCENDING)], name='pkg_ascending')
+
+            scan(pkg_col, pkg_old_col, file_col)
+            prune(pkg_col, pkg_old_col, file_col)
+            gen_packages(pkg_col)
+            gen_contents(pkg_col, file_col)
+            gen_release(pkg_col)
+
     # check_elf_dep(pkg_col)
 
 
