@@ -17,8 +17,8 @@ class PkgInfoWrapper(object):
 
 def scan(path: str):
     import subprocess
-    with open(path, 'rb') as f:
-        result = subprocess.check_output(os.path.dirname(__file__) + '/pkgscan_cli', stdin=f, stderr=subprocess.DEVNULL)
+    result = subprocess.check_output([os.path.dirname(__file__) + '/pkgscan_cli', path],
+                                     stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     p = pkg_info()
     p.ParseFromString(result)
     return PkgInfoWrapper(p)
