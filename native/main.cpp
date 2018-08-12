@@ -1,8 +1,7 @@
 #include <iostream>
-#include <iomanip>
 #include <fcntl.h>
-#include "main.h"
 #include "package.h"
+#include "json.hpp"
 
 int main(int argc, const char *argv[]) {
     int fd = 0;
@@ -19,28 +18,32 @@ int main(int argc, const char *argv[]) {
     }
     if (fd != 0) close(fd);
 
-    // Serialize result into stdout with ProtoBuf
-    Proto::pkg_info p{};
-    p.set_size(pkg.size);
-    p.set_hash_alg("SHA256");
-    p.set_hash_value(pkg.sha256, sizeof(pkg.sha256));
-    p.set_control(pkg.control);
-    p.set_time(pkg.mtime);
-    auto p_files = p.mutable_files();
+    using json = nlohmann::json;
+    json j = {
+            {"size",        pkg.size},
+            {"hash_alg",    "SHA256"},
+            {"hash_value",  pkg.sha256},
+            {"control",     pkg.control},
+            {"time",        pkg.mtime},
+            {"so_provides", pkg.so_provides},
+            {"so_depends",  pkg.so_depends},
+    };
+    auto j_files = json::array();
     for (auto &i : pkg.files) {
-        auto f = p_files->Add();
-        f->set_path(i.path);
-        f->set_is_dir(i.is_dir);
-        f->set_size(i.size);
-        f->set_type(i.type);
-        f->set_perm(i.perm);
-        f->set_uid(i.uid);
-        f->set_gid(i.gid);
-        f->set_uname(i.uname);
-        f->set_gname(i.gname);
+        json j_file = {
+                {"path",   i.path},
+                {"is_dir", i.is_dir},
+                {"size",   i.size},
+                {"type",   i.type},
+                {"perm",   i.perm},
+                {"uid",    i.uid},
+                {"gid",    i.gid},
+                {"uname",  i.uname},
+                {"gname",  i.gname},
+        };
+        j_files.push_back(j_file);
     }
-    auto p_so_provides = p.mutable_so_provides(), p_so_depends = p.mutable_so_depends();
-    for (auto &i : pkg.so_provides) *p_so_provides->Add() = i;
-    for (auto &i : pkg.so_depends) *p_so_depends->Add() = i;
-    p.SerializeToOstream(&std::cout);
+    j["files"] = j_files;
+    std::cout << j.dump(-1, ' ', true) << std::endl;
+    return 0;
 }

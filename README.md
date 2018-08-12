@@ -10,7 +10,6 @@ Multi repository, finding potential file collisions, checking shared object comp
 - Python 3
 - OpenSSL (libcrypto)
 - LibArchive
-- Protocol Buffer
 - (Python 3) pymongo
 
 And you need a MongoDB server. You may deploy one on your local machine.

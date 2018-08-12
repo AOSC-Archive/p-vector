@@ -36,6 +36,7 @@ def split_soname(s: str):
 
 def doc_from_pkg_scan(p):
     import bson
+    hash_value = bytes(p.p['hash_value'])
     pkg_doc = {
         'pkg': {
             'name': p.control['Package'],
@@ -45,30 +46,30 @@ def doc_from_pkg_scan(p):
         },
         'deb': {
             'path': p.filename,
-            'size': bson.int64.Int64(p.p.size),
-            'hash': p.p.hash_value,
+            'size': bson.int64.Int64(p.p['size']),
+            'hash': hash_value,
             'mtime': p.mtime
         },
-        'time': p.p.time,
+        'time': p.p['time'],
         'control': p.control,
         'relation': p.control.relations,
-        'so_provides': [split_soname(i) for i in p.p.so_provides],
-        'so_depends': [split_soname(i) for i in p.p.so_depends],
+        'so_provides': [split_soname(i) for i in p.p['so_provides']],
+        'so_depends': [split_soname(i) for i in p.p['so_depends']],
     }
     file_doc = []
-    for f in p.p.files:
+    for f in p.p['files']:
         doc = {
-            'deb': p.p.hash_value,
+            'deb': hash_value,
             'pkg': pkg_doc['pkg'],
-            'path': f.path,
-            'is_dir': f.is_dir,
-            'size': bson.int64.Int64(f.size),
-            'type': f.type,
-            'perm': f.perm,
-            'uid': f.uid,
-            'gid': f.gid,
-            'uname': f.uname,
-            'gname': f.gname,
+            'path': f['path'],
+            'is_dir': f['is_dir'],
+            'size': bson.int64.Int64(f['size']),
+            'type': f['type'],
+            'perm': f['perm'],
+            'uid': f['uid'],
+            'gid': f['gid'],
+            'uname': f['uname'],
+            'gname': f['gname'],
         }
         doc['path'] = os.path.normpath(os.path.join('/', doc['path']))
         doc['base'] = os.path.basename(doc['path'])
@@ -160,7 +161,7 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
         if status == 'update':
             # if a document points to the same path exists, replace it
             pkg_col.replace_one({'deb.path': rel_path}, pkg_doc)
-            file_col.delete_many({'deb': p.p.hash_value})
+            file_col.delete_many({'deb': pkg_doc['deb']['hash_value']})
             file_col.insert_many(file_doc)
             I('SCAN', 'UPDATE', rel_path)
         else:
