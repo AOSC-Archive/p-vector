@@ -1,7 +1,7 @@
 import re
 
 _partitions = re.compile(r'^((?P<epoch>[0-9]+):)?(?P<body>[A-Za-z0-9.+~-]+)$')
-_non_digit = re.compile(r'^[A-Za-z.+~]*')
+_non_digit = re.compile(r'^[A-Za-z.+~-]*')
 _digit = re.compile(r'^[0-9]*')
 
 
@@ -9,7 +9,7 @@ def _break_down(ver: str):
     parts = _partitions.match(ver)
     if parts is None:
         raise AssertionError('malformed Version string')
-    epoch = int(parts.group('epoch')) if parts.group('epoch') is not None else 0
+    epoch = parts.group('epoch') if parts.group('epoch') is not None else '0'
     body = parts.group('body')
     upstream_version, debian_revision = body, ''
     if body.find('-') != -1:
@@ -17,58 +17,61 @@ def _break_down(ver: str):
     return epoch, upstream_version, debian_revision
 
 
-def _compare_body(body_a: str, body_b: str):
+def _comparable_digit(i: str):
+    clean_number = i.lstrip('0')
+    if clean_number == '':
+        clean_number = '0'
+    length = len(clean_number)
+    if not (1 <= length <= 26):
+        raise AssertionError('malformed number string')
+    return chr(ord('a') + (length - 1)) + clean_number
+
+
+def _comparable_non_digit(s: str):
+    # Add '|' to indicate the end of string
+    s = (s + '|').encode('ASCII')
+
+    def m(n):
+        if n == ord('|'):
+            return ord('%')  # Let the end of string be 1
+        if n == ord('~'):
+            return ord('#')  # '~' should be even less than the end of string
+        return n
+
+    return bytes(map(m, s)).decode('ASCII')
+
+
+def _comparable_body(body: str):
     def cut(ver: str, r):
         result = r.match(ver)
         if result is not None:
             return result.group(), ver[len(result.group()):]
         return '', ver
 
-    def non_digit_mapping(ver: str):
-        # Add '|' to indicate the end of string
-        ver = (ver + '|').encode('ASCII')
-
-        def m(n):
-            if n == b'|'[0]:
-                return 1  # Let the end of string be 1
-            if n == b'~'[0]:
-                return 0  # '~' should be even less than the end of string
-            return n
-
-        return bytes(map(m, ver))
-
-    def digit_mapping(ver: str):
-        return int(ver) if ver != '' else 0
-
+    output_body = ''
     while True:
-        sec_a, body_a = cut(body_a, _non_digit)
-        sec_b, body_b = cut(body_b, _non_digit)
-        sec_a, sec_b = non_digit_mapping(sec_a), non_digit_mapping(sec_b)
-        for i in range(min(len(sec_a), len(sec_b))):
-            if sec_a[i] - sec_b[i] != 0:
-                return sec_a[i] - sec_b[i]
-        # sec_a equals to sec_b
-        if body_a + body_b == '':
+        sec, body = cut(body, _non_digit)
+        sec = _comparable_non_digit(sec)
+        output_body += sec
+        if body == '':
             break
-        sec_a, body_a = cut(body_a, _digit)
-        sec_b, body_b = cut(body_b, _digit)
-        sec_a, sec_b = digit_mapping(sec_a), digit_mapping(sec_b)
-        if sec_a - sec_b != 0:
-            return sec_a - sec_b
-        # sec_a equals to sec_b
-        if body_a + body_b == '':
-            break
-    return 0
+        sec, body = cut(body, _digit)
+        sec = _comparable_digit(sec)
+        output_body += sec
+    return output_body
+
+
+def comparable_ver(a: str):
+    epoch_a, uv_a, dr_a = _break_down(a)
+    return _comparable_digit(epoch_a) + '!' + _comparable_body(uv_a) + '!' + _comparable_body(dr_a)
 
 
 def compare_ver(a: str, b: str):
-    epoch_a, uv_a, dr_a = _break_down(a)
-    epoch_b, uv_b, dr_b = _break_down(b)
-
-    if epoch_a - epoch_b != 0:
-        return epoch_a - epoch_b
-
-    uv_delta = _compare_body(uv_a, uv_b)
-    if uv_delta != 0:
-        return uv_delta
-    return _compare_body(dr_a, dr_b)
+    a = comparable_ver(a)
+    b = comparable_ver(b)
+    if a > b:
+        return 1
+    if a == b:
+        return 0
+    if a < b:
+        return -1
