@@ -1,10 +1,8 @@
 #include <archive_entry.h>
-#include <libgen.h>
 #include <iostream>
 
 #include "package.h"
 #include "elf_dependency.h"
-#include "package_archive_custom.h"
 
 
 static bool begins_with(const std::string &str, const std::string &prefix) noexcept {
@@ -119,7 +117,6 @@ void Package::data_tar() {
     for (auto &dep : self_resolved) {
         this->so_depends.erase(dep);
     }
-
 }
 
 void Package::data_tar_file(archive *tar, archive_entry *e) {
@@ -158,11 +155,13 @@ void Package::data_tar_file(archive *tar, archive_entry *e) {
     try {
         elf_dependency.scan();
         if (elf_dependency.is_dyn) {
-            this->so_priv_provides.insert(elf_dependency.so_name);
+            if (!elf_dependency.so_name.empty())
+                this->so_priv_provides.insert(elf_dependency.so_name);
             this->so_priv_provides.insert(basename((char *) f.path.c_str()));
 
             if (looks_like_so && smells_like_so) {
-                this->so_provides.insert(elf_dependency.so_name);
+                if (!elf_dependency.so_name.empty())
+                    this->so_provides.insert(elf_dependency.so_name);
                 this->so_provides.insert(basename((char *) f.path.c_str()));
             }
         }
