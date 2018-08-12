@@ -394,13 +394,6 @@ def get_collections(db: Database, branch: str, component: str) -> (Collection, C
 
 
 def main():
-    def signal_handler(sig, frame):
-        global interrupted
-        interrupted = True
-        W('MAIN', 'Received SIGINT', file=sys.stderr)
-
-    signal.signal(signal.SIGINT, signal_handler)
-
     origin = sys.argv[1]
     with open(origin + '.db', 'r') as db_conn_str:
         client = pymongo.MongoClient(
