@@ -26,6 +26,7 @@ release_info = ''
 
 DATETIME_FORMAT = '%a, %d %b %Y %H:%M:%S %z'
 
+
 def split_soname(s: str):
     r = re.compile('\.so(?!=[$.])')
     pos = r.search(s)
