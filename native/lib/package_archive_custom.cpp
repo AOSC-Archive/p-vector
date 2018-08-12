@@ -9,9 +9,9 @@ static int dummy_cb(struct archive *, void *) {
     return ARCHIVE_OK;
 }
 
-static la_ssize_t read_pipe_cb(struct archive *a, void *_client_data, const void **_buffer) {
+static ssize_t read_pipe_cb(struct archive *a, void *_client_data, const void **_buffer) {
     size_t size;
-    la_int64_t offset;
+    ssize_t offset;
     archive_read_data_block((archive *) _client_data, _buffer, &size, &offset);
     archive_copy_error((archive *) _client_data, a);
     return size;
@@ -39,7 +39,7 @@ static int close_hash_fd_cb(struct archive *, void *_client_data) {
     return ARCHIVE_OK;
 }
 
-static la_ssize_t read_hash_fd_cb(struct archive *a, void *_client_data, const void **_buffer) {
+static ssize_t read_hash_fd_cb(struct archive *a, void *_client_data, const void **_buffer) {
     auto p = (payload_hash_fd *) _client_data;
     *_buffer = p->_buf;
 
