@@ -1,8 +1,10 @@
 #include <archive_entry.h>
 #include <iostream>
+#include <libgen.h>
 
 #include "package.h"
 #include "elf_dependency.h"
+#include "package_archive_custom.h"
 
 
 static bool begins_with(const std::string &str, const std::string &prefix) noexcept {
