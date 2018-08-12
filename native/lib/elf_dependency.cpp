@@ -1,6 +1,7 @@
 #include <elf.h>
 #include <iostream>
 #include <cassert>
+#include <vector>
 
 #include "elf_dependency.h"
 
