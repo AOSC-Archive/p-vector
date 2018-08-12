@@ -2,6 +2,7 @@
 import os
 import pathlib
 import re
+import signal
 import subprocess
 import sys
 import threading
@@ -9,23 +10,21 @@ from datetime import timedelta, timezone
 
 import pymongo
 from pymongo.collection import Collection
+from pymongo.cursor import Cursor
+from pymongo.database import Database
+from pymongo.errors import DuplicateKeyError
 
 sys.path.insert(0, os.path.normpath(os.path.dirname(__file__) + '/../libexec/p-vector'))
 from print import *
-import pkg_scan
+import pkgscan
 import dpkg_version
 
-REPO_DIR = '.'
+interrupted = False
+
+base_dir = '.'
+release_info = ''
 
 DATETIME_FORMAT = '%a, %d %b %Y %H:%M:%S %z'
-
-OVERRIDE_RELEASE = '''Origin: AOSC
-Label: AOSC OS (amd64)
-Suite: os-amd64
-Codename: eMMC
-Description: AOSC OS Repository (amd64)
-'''
-
 
 def split_soname(s: str):
     r = re.compile('\.so(?!=[$.])')
@@ -36,17 +35,19 @@ def split_soname(s: str):
 
 
 def doc_from_pkg_scan(p):
+    import bson
     pkg_doc = {
         'pkg': {
             'name': p.control['Package'],
             'ver': p.control['Version'],
+            'comp_ver': dpkg_version.comparable_ver(p.control['Version']),
             'arch': p.control['Architecture'],
         },
         'deb': {
             'path': p.filename,
-            'size': p.p.size,
+            'size': bson.int64.Int64(p.p.size),
             'hash': p.p.hash_value,
-            'mtime': p.mtime_ns
+            'mtime': p.mtime
         },
         'time': p.p.time,
         'control': p.control,
@@ -54,7 +55,6 @@ def doc_from_pkg_scan(p):
         'so_provides': [split_soname(i) for i in p.p.so_provides],
         'so_depends': [split_soname(i) for i in p.p.so_depends],
     }
-
     file_doc = []
     for f in p.p.files:
         doc = {
@@ -62,7 +62,7 @@ def doc_from_pkg_scan(p):
             'pkg': pkg_doc['pkg'],
             'path': f.path,
             'is_dir': f.is_dir,
-            'size': f.size,
+            'size': bson.int64.Int64(f.size),
             'type': f.type,
             'perm': f.perm,
             'uid': f.uid,
@@ -84,7 +84,7 @@ def prune(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
     total = cur.count()
     count = 0
     for i in cur:
-        if not pathlib.PosixPath(REPO_DIR).joinpath(i['deb']['path']).exists():
+        if not pathlib.PosixPath(base_dir).joinpath(i['deb']['path']).exists():
             delete_list.append((i['deb']['path'], i['pkg']))
         count += 1
         progress_bar('Check current', count / total)
@@ -93,7 +93,7 @@ def prune(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
     total = cur.count()
     count = 0
     for i in cur:
-        if not pathlib.PosixPath(REPO_DIR).joinpath(i['deb']['path']).exists():
+        if not pathlib.PosixPath(base_dir).joinpath(i['deb']['path']).exists():
             delete_old_list.append(i['deb']['path'])
         count += 1
         progress_bar('Check archive', count / total)
@@ -120,133 +120,133 @@ def prune(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
 
 
 def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
-    free_slots = threading.Semaphore(os.cpu_count() + 2)
-    db_lock = threading.Lock()
+    from concurrent.futures import ThreadPoolExecutor
+    executor = ThreadPoolExecutor(max_workers=os.cpu_count() + 10)
+    futures = []
     counter_lock = threading.Lock()
     count = 0
     total = 0
 
-    def scan_deb(rel_path: str):
-        deb_path = pathlib.PosixPath(REPO_DIR).joinpath(rel_path)
-        st = deb_path.stat()
-        mtime_ns = st.st_mtime_ns
-        size = st.st_size
+    def signal_handler(sig, frame):
+        global interrupted
+        interrupted = True
+        for future in futures:
+            future.cancel()
+        W('SCAN', 'Received SIGINT. Cancelled pending jobs.', file=sys.stderr)
 
-        with db_lock:
-            same_file = pkg_col.find_one({'deb.path': rel_path}, {'_id': 0})
-            same_old_file = pkg_old_col.find_one({'deb.path': rel_path}, {'_id': 0})
+    signal.signal(signal.SIGINT, signal_handler)
 
-        '''
-        Suppose there are no changes if it has:
-        * the same path (unique);
-        * the same size;
-        * the same modify time.
-        
-        We will not try to calculate hash now because it is too costly.
-        '''
-        if same_file is not None and \
-                same_file['deb']['size'] == size and \
-                same_file['deb']['mtime'] == mtime_ns:
-            free_slots.release()
-            return
-        if same_old_file is not None and \
-                same_old_file['deb']['size'] == size and \
-                same_old_file['deb']['mtime'] == mtime_ns:
-            free_slots.release()
-            return
-
+    def scan_deb(rel_path: str, mtime: int, status: str):
+        deb_path = pathlib.PosixPath(base_dir).joinpath(rel_path)
         # Scan it.
         from subprocess import CalledProcessError
         try:
-            p = pkg_scan.scan(str(deb_path))
+            p = pkgscan.scan(str(deb_path))
         except CalledProcessError as e:
-            if e.returncode not in [1, 2]:
-                raise
-            E('SCAN', 'ERROR ', rel_path, 'is corrupted')
+            if e.returncode < 0 and signal.Signals(-e.returncode) == signal.SIGINT:
+                W('SCAN', 'INTR  ', rel_path, file=sys.stderr)
+                return
+            if e.returncode in [1, 2]:
+                E('SCAN', 'ERROR ', rel_path, 'is corrupted, status:', e.returncode)
+                return
+            raise
+        if interrupted:
             return
-        finally:
-            free_slots.release()
+        # Make a new document
+        p.filename = rel_path
+        p.mtime = mtime
+        pkg_doc, file_doc = doc_from_pkg_scan(p)
 
-        with db_lock:
-            # Return if the same hash exists
-            same_hash = pkg_old_col.find_one({'deb.hash': p.p.hash_value}, {'_id': 0})
-            if same_hash is not None:
-                E('SCAN', 'DUP   ', rel_path, '<=>', same_hash['deb']['path'])
-                return
-            same_hash = pkg_col.find_one({'deb.hash': p.p.hash_value}, {'_id': 0})
-            if same_hash is not None:
-                E('SCAN', 'DUP   ', rel_path, '<=>', same_hash['deb']['path'])
-                return
-
-            # Make a new document
-            p.filename = rel_path
-            p.mtime_ns = mtime_ns
-            pkg_doc, file_doc = doc_from_pkg_scan(p)
-
-            same_file = pkg_col.find_one({'deb.path': rel_path}, {'_id': 0})
-            if same_file is not None:
-                # if a document points to the same path exists, replace it
-                pkg_col.replace_one({'deb.path': rel_path}, pkg_doc)
-                file_col.delete_many({'deb': p.p.hash_value})
-                file_col.insert_many(file_doc)
-                I('SCAN', 'UPDATE', rel_path)
-            else:
-                # if this is a new document
-                same_pkg = pkg_col.find_one({'pkg.name': pkg_doc['pkg']['name']}, {'_id': 0})
-                if same_pkg is not None:
-                    # if a package with the same name exists,
-                    r = dpkg_version.compare_ver(same_pkg['pkg']['ver'], pkg_doc['pkg']['ver'])
-                    if r > 0:
-                        # This one is earlier, we do nothing. We had better delete it.
-                        W('SCAN', 'OLD   ', rel_path, '<<', same_pkg['deb']['path'])
-                        pkg_old_col.replace_one({'pkg': pkg_doc['pkg']}, pkg_doc, upsert=True)
-                    if r == 0:
-                        # They have the same version, it's just not right
-                        # (They have different paths, different hashes, but same versions?
-                        # Package Manager cannot decide to use which one).
-                        E('SCAN', 'DUP   ', rel_path, '==', same_pkg['deb']['path'])
-                    if r < 0:
-                        # This one is newer, put the old one into archive, insert this one.
-                        I('SCAN', 'NEWER ', rel_path, '>>', same_pkg['deb']['path'])
-                        pkg_col.replace_one({'pkg.name': pkg_doc['pkg']['name']}, pkg_doc)
-                        pkg_old_col.insert_one(same_pkg)
-                        file_col.delete_many({'pkg': same_pkg['pkg']})
-                        file_col.insert_many(file_doc)
+        if status == 'update':
+            # if a document points to the same path exists, replace it
+            pkg_col.replace_one({'deb.path': rel_path}, pkg_doc)
+            file_col.delete_many({'deb': p.p.hash_value})
+            file_col.insert_many(file_doc)
+            I('SCAN', 'UPDATE', rel_path)
+        else:
+            # if this is a new document
+            try:
+                old_pkg = pkg_col.find_one_and_replace(
+                    {'pkg.name': pkg_doc['pkg']['name'],
+                     'pkg.arch': pkg_doc['pkg']['arch'],
+                     'pkg.comp_ver': {'$lt': pkg_doc['pkg']['comp_ver']}
+                     }, pkg_doc, {'_id': False}, upsert=True)
+            except DuplicateKeyError:
+                same_ver_pkg = pkg_col.find_one({'pkg': pkg_doc['pkg']})
+                if same_ver_pkg is None:
+                    # This one is older, we do nothing. We had better delete it.
+                    W('SCAN', 'OLD   ', pkg_doc['pkg']['arch'], pkg_doc['pkg']['name'], pkg_doc['pkg']['ver'])
+                    pkg_old_col.insert_one(pkg_doc)
                 else:
-                    # Completely new package
-                    pkg_col.insert_one(pkg_doc)
-                    file_col.insert_many(file_doc)
-                    I('SCAN', 'NEW   ', rel_path)
+                    E('SCAN', 'DUP   ', rel_path, '==', same_ver_pkg['deb']['path'])
+                return
+            if old_pkg is not None:
+                # This one is newer, put the old one into archive, insert this one.
+                I('SCAN', 'NEWER ', pkg_doc['pkg']['arch'], pkg_doc['pkg']['name'],
+                  pkg_doc['pkg']['ver'], '>>', old_pkg['pkg']['ver'])
+                pkg_old_col.insert_one(old_pkg)
+                file_col.delete_many({'pkg': old_pkg['pkg']})
+                file_col.insert_many(file_doc)
+            else:
+                # Completely new package
+                file_col.insert_many(file_doc)
+                I('SCAN', 'NEW   ', pkg_doc['pkg']['arch'], pkg_doc['pkg']['name'], pkg_doc['pkg']['ver'])
 
-    def containment_shell(rel_path):
+    def containment_shell(*args):
+        nonlocal count
         try:
-            scan_deb(rel_path)
-        except Exception:
-            print('ERROR', rel_path, file=sys.stderr)
+            scan_deb(*args)
+        except Exception as e:
+            E('SCAN', e, 'with', args, file=sys.stderr)
             raise
         finally:
             with counter_lock:
-                nonlocal count
                 count += 1
-                progress_bar('Scan .deb', count / total)
+            progress_bar('Scan .deb', count / total)
 
-    search_path = pathlib.PosixPath(REPO_DIR)
-    jobs = list(search_path.rglob('*.deb'))
-    jobs.sort()
-    total = len(jobs)
+    deb_files = {}
+    search_path = pathlib.PosixPath(base_dir)
+    for i in search_path.rglob('*.deb'):
+        if not i.is_file():
+            continue
+        s = i.stat()
+        deb_files[str(i.relative_to(base_dir))] = {
+            'size': s.st_size,
+            'mtime': s.st_mtime_ns,
+            'status': 'new'
+        }
 
-    thread_pool = []
-    for i in jobs:
-        if i.is_file():
-            free_slots.acquire()
-            t = threading.Thread(target=containment_shell, args=[str(i.relative_to(REPO_DIR))])
-            thread_pool.append(t)
-            t.start()
-    for t in thread_pool:
-        # Wait all threads
-        t.join()
+    def filter_deb_files(pkg_in_db: Cursor, files: dict):
+        for cur in pkg_in_db:
+            '''
+            Suppose there are no changes if it has:
+            * the same path (unique);
+            * the same size;
+            * the same modify time.
+            We will not try to calculate hash now because it is too costly.
+            '''
+            path = cur['deb']['path']
+            mtime = cur['deb']['mtime']
+            size = cur['deb']['size']
+            if files[path]['mtime'] != mtime or files[path]['size'] != size:
+                files[path]['status'] = 'update'
+            else:
+                del files[path]
 
-    progress_bar_end('Scan .deb')
+    query_exist = {'deb.path': {'$in': [path for path in deb_files]}}
+    project_exist = {'_id': False, 'deb': True}
+    filter_deb_files(pkg_old_col.find(query_exist, project_exist), deb_files)
+    filter_deb_files(pkg_col.find(query_exist, project_exist), deb_files)
+
+    total = len(deb_files)
+    with executor:
+        for path in deb_files:
+            futures.append(executor.submit(
+                containment_shell, path, deb_files[path]['mtime'], deb_files[path]['status']))
+    if not interrupted:
+        progress_bar_end('Scan .deb')
+    else:
+        print()
 
 
 def check_file_dup(file_col: Collection):
@@ -284,7 +284,7 @@ def check_file_dup(file_col: Collection):
 def gen_packages(pkg_col: Collection):
     cur = pkg_col.find({}, {'_id': 0, 'pkg': 1, 'deb': 1, 'control': 1}).sort([('pkg', pymongo.ASCENDING)])
 
-    with open(REPO_DIR + '/Packages', 'w', encoding='UTF-8') as f:
+    with open(base_dir + '/Packages', 'w', encoding='UTF-8') as f:
         count = 0
         total = cur.count()
         for i in cur:
@@ -299,13 +299,13 @@ def gen_packages(pkg_col: Collection):
                 progress_bar('Generate Packages', count / total)
         progress_bar_end('Generate Packages')
     print('Compress Packages...')
-    subprocess.check_call(['xz', '-k', '-0', '-f', REPO_DIR + '/Packages'])
+    subprocess.check_call(['xz', '-k', '-0', '-f', base_dir + '/Packages'])
 
 
 def gen_contents(pkg_col: Collection, file_col: Collection):
     cur = file_col.find({'is_dir': False}, {'_id': 0, 'pkg.name': 1, 'path': 1}).sort('path')
     arch = pkg_col.find_one({}, {'pkg.arch': 1})['pkg']['arch']
-    with open(REPO_DIR + '/Contents-' + arch, 'w', encoding='UTF-8') as f:
+    with open(base_dir + '/Contents-' + arch, 'w', encoding='UTF-8') as f:
         count = 0
         total = cur.count()
         for i in cur:
@@ -316,13 +316,13 @@ def gen_contents(pkg_col: Collection, file_col: Collection):
                 progress_bar('Generate Contents', count / total)
         progress_bar_end('Generate Contents')
     print('Compress Contents...')
-    subprocess.check_call(['xz', '-k', '-0', '-f', REPO_DIR + '/Contents-' + arch])
+    subprocess.check_call(['xz', '-k', '-0', '-f', base_dir + '/Contents-' + arch])
 
 
 def gen_release(pkg_col: Collection):
     arch = pkg_col.find_one({}, {'pkg.arch': 1})['pkg']['arch']
     import deb822
-    r = deb822.Release(OVERRIDE_RELEASE)
+    r = deb822.Release(release_info)
 
     if 'Architectures' not in r:
         r['Architectures'] = arch
@@ -331,7 +331,7 @@ def gen_release(pkg_col: Collection):
         import Crypto.Hash.SHA256
         result = Crypto.Hash.SHA256.SHA256Hash()
         file_size = 0
-        with open(REPO_DIR + '/' + path, 'rb') as file:
+        with open(base_dir + '/' + path, 'rb') as file:
             while True:
                 block = file.read(8192)
                 if len(block) == 0:
@@ -357,52 +357,86 @@ def gen_release(pkg_col: Collection):
     ]
 
     print('Generate Release...')
-    with open(REPO_DIR + '/Release', 'w', encoding='UTF-8') as f:
+    with open(base_dir + '/Release', 'w', encoding='UTF-8') as f:
         print(r, file=f)
 
     print('Sign Release...')
     subprocess.check_call(
-        ['gpg', '--batch', '--yes', '--clearsign', '-o', REPO_DIR + '/InRelease', REPO_DIR + '/Release'])
+        ['gpg', '--batch', '--yes', '--clearsign', '-o', base_dir + '/InRelease', base_dir + '/Release'])
 
     print('Clean Release...')
-    os.remove(REPO_DIR + '/Release')
+    os.remove(base_dir + '/Release')
+
+
+def get_collections(db: Database, branch: str, component: str) -> (Collection, Collection, Collection):
+    col_name = '%s/%s' % (branch, component)
+    pkg_col = db[col_name]
+    pkg_col.create_index([('deb.hash', pymongo.ASCENDING)], unique=True)
+    pkg_col.create_index([('deb.path', pymongo.ASCENDING)], unique=True)
+    pkg_col.create_index([('pkg', pymongo.ASCENDING)], unique=True)
+    pkg_col.create_index([
+        ('pkg.name', pymongo.ASCENDING),
+        ('pkg.arch', pymongo.ASCENDING)],
+        name='pkg_one_version', unique=True)
+    pkg_col.create_index([('pkg.arch', pymongo.ASCENDING)])
+
+    pkg_old_col = db[col_name + '.old']
+    pkg_old_col.create_index([('deb.hash', pymongo.ASCENDING)], unique=True)
+    pkg_old_col.create_index([('pkg', pymongo.ASCENDING)], unique=True)
+    pkg_old_col.create_index([('pkg.arch', pymongo.ASCENDING)])
+
+    file_col = db[col_name + '.files']
+    file_col.create_index([('path', pymongo.ASCENDING)])
+    file_col.create_index([('pkg', pymongo.ASCENDING)])
+    file_col.create_index([('pkg.arch', pymongo.ASCENDING)])
+
+    return pkg_col, pkg_old_col, file_col
 
 
 def main():
-    client = pymongo.MongoClient('localhost', 27017)
-    origin = 'aosc-os'
+    def signal_handler(sig, frame):
+        global interrupted
+        interrupted = True
+        W('MAIN', 'Received SIGINT', file=sys.stderr)
+
+    signal.signal(signal.SIGINT, signal_handler)
+
+    origin = sys.argv[1]
+    with open(origin + '.db', 'r') as db_conn_str:
+        client = pymongo.MongoClient(
+            db_conn_str.readline().strip(),
+            appname='p-vector-scanner', ssl_ca_certs=origin + '.crt')
+
     import yaml
     with open(origin + '.yml', 'rb') as f:
         y = yaml.load_all(f)
-        db = client['p-vector_' + origin]
+        global base_dir, release_info
+        first_doc = next(y)
+        base_dir = first_doc['path']
+        del first_doc['path']
+        #        OVERRIDE_RELEASE = y[0]
+        db = client['p-vector']
         for i in y:
             if i is None:
                 continue
-
-            global REPO_DIR, OVERRIDE_RELEASE
-            REPO_DIR = i['path']
-            OVERRIDE_RELEASE = i['release']
-            repo_name = i['name']
-            print('====', repo_name, '====')
-
-            pkg_col = db[repo_name]
-            pkg_col.create_index([('deb.hash', pymongo.ASCENDING)], name='hash_unique', unique=True)
-            pkg_col.create_index([('deb.path', pymongo.ASCENDING)], name='path_unique', unique=True)
-            pkg_col.create_index([('pkg', pymongo.ASCENDING)], name='pkg_ascending', unique=True)
-
-            pkg_old_col = db[repo_name + '.old']
-            pkg_old_col.create_index([('deb.hash', pymongo.ASCENDING)], name='hash_unique', unique=True)
-            pkg_old_col.create_index([('pkg', pymongo.ASCENDING)], name='pkg_ascending', unique=True)
-
-            file_col = db[repo_name + '.files']
-            file_col.create_index([('path', pymongo.ASCENDING)], name='path_ascending')
-            file_col.create_index([('pkg', pymongo.ASCENDING)], name='pkg_ascending')
-
-            scan(pkg_col, pkg_old_col, file_col)
-            prune(pkg_col, pkg_old_col, file_col)
-            gen_packages(pkg_col)
-            gen_contents(pkg_col, file_col)
-            gen_release(pkg_col)
+            branch_name = i['branch']
+            print('====', branch_name, '====')
+            for component_dir in pathlib.PosixPath(base_dir).joinpath('pool').joinpath(branch_name).iterdir():
+                if not component_dir.is_dir():
+                    continue
+                component_name = component_dir.name
+                pkg_col, pkg_old_col, file_col = get_collections(db, branch_name, component_name)
+                print(branch_name, component_name)
+                # import check_elf
+                # check_elf.check(pkg_col)
+                # exit()
+                scan(pkg_col, pkg_old_col, file_col)
+                if interrupted:
+                    exit(1)
+                # prune(pkg_col, pkg_old_col, file_col)
+                # gen_packages(pkg_col)
+                # gen_contents(pkg_col, file_col)
+                # gen_release(pkg_col)
 
     # check_elf_dep(pkg_col)
 
