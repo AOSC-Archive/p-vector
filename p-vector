@@ -120,9 +120,9 @@ def prune(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
     return
 
 
-def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
+def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection, branch: str, component: str):
     from concurrent.futures import ThreadPoolExecutor
-    executor = ThreadPoolExecutor(max_workers=os.cpu_count() + 10)
+    executor = ThreadPoolExecutor(max_workers=1)  # os.cpu_count() + 10)
     futures = []
     counter_lock = threading.Lock()
     count = 0
@@ -206,7 +206,7 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
             progress_bar('Scan .deb', count / total)
 
     deb_files = {}
-    search_path = pathlib.PosixPath(base_dir)
+    search_path = pathlib.PosixPath(base_dir).joinpath('pool').joinpath(branch).joinpath(component)
     for i in search_path.rglob('*.deb'):
         if not i.is_file():
             continue
@@ -424,7 +424,7 @@ def main():
                 # import check_elf
                 # check_elf.check(pkg_col)
                 # exit()
-                scan(pkg_col, pkg_old_col, file_col)
+                scan(pkg_col, pkg_old_col, file_col, branch_name, component_name)
                 if interrupted:
                     exit(1)
                 # prune(pkg_col, pkg_old_col, file_col)
