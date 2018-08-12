@@ -1,7 +1,6 @@
 add_definitions(-D_FILE_OFFSET_BITS=64)
-add_definitions(-Wall)
-add_definitions(-O3)
-add_definitions(-g1)
+add_compile_options(-Wall -Wextra -Werror)
+add_compile_options(-O3 -g1)
 
 configure_file(main.h.in main.h @ONLY)
 
