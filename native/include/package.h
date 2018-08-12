@@ -33,17 +33,17 @@ public:
 
     void scan(int fd);
 
-    std::string control{};
-    std::time_t mtime{};
-    std::vector<file_entry> files{};
-    std::set<std::string> so_provides{};
-    std::set<std::string> so_depends{};
+    std::string control;
+    std::time_t mtime;
+    std::vector<file_entry> files;
+    std::set<std::string> so_provides;
+    std::set<std::string> so_depends;
     off_t size{};
-    unsigned char sha256[SHA256_DIGEST_LENGTH]{};
+    unsigned char sha256[SHA256_DIGEST_LENGTH];
 
 private:
     archive *deb;
-    std::set<std::string> so_priv_provides{};
+    std::set<std::string> so_priv_provides;
 
     void control_tar();
 
