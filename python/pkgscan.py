@@ -18,4 +18,4 @@ def scan(path: str):
     import subprocess
     result = subprocess.check_output([os.path.dirname(__file__) + '/pkgscan_cli', path],
                                      stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return PkgInfoWrapper(json.loads(result))
+    return PkgInfoWrapper(json.loads(result.decode('utf-8')))
