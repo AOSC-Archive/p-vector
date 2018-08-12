@@ -149,7 +149,7 @@ void Package::data_tar_file(archive *tar, archive_entry *e) {
 
     ElfDependency elf_dependency(
             [&](void *buf, size_t size) {
-                la_int64_t ret = archive_read_data(tar, buf, size);
+                ssize_t ret = archive_read_data(tar, buf, size);
                 if (ret < 0) throw archive_corrupted();
                 return (size_t) ret;
             });
