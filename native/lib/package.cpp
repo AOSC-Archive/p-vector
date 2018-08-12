@@ -169,5 +169,6 @@ void Package::data_tar_file(archive *tar, archive_entry *e) {
         }
     } catch (elf_corrupted &e) {}
 
-    this->so_depends.merge(elf_dependency.so_depends);
+    for (auto &i: elf_dependency.so_depends)
+        this->so_depends.insert(i);
 }

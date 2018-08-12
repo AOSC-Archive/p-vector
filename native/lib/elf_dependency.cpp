@@ -131,29 +131,23 @@ void ElfDependency::scan() {
 
 template<typename T>
 T ElfDependency::H(T v) noexcept {
-    static_assert(
-            sizeof(T) == 8
-            || sizeof(T) == 4
-            || sizeof(T) == 2
-            || sizeof(T) == 1);
-
     if (endian == ELFDATA2MSB) {
-        if constexpr (sizeof(T) == 1)
+        if (sizeof(T) == 1)
             return v;
-        else if constexpr (sizeof(T) == 2)
+        else if (sizeof(T) == 2)
             return be16toh(v);
-        else if constexpr (sizeof(T) == 4)
+        else if (sizeof(T) == 4)
             return be32toh(v);
-        else if constexpr (sizeof(T) == 8)
+        else if (sizeof(T) == 8)
             return be64toh(v);
     } else {
-        if constexpr (sizeof(T) == 1)
+        if (sizeof(T) == 1)
             return v;
-        else if constexpr (sizeof(T) == 2)
+        else if (sizeof(T) == 2)
             return le16toh(v);
-        else if constexpr (sizeof(T) == 4)
+        else if (sizeof(T) == 4)
             return le32toh(v);
-        else if constexpr (sizeof(T) == 8)
+        else if (sizeof(T) == 8)
             return le64toh(v);
     }
     assert(false);
