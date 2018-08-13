@@ -190,7 +190,7 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection, bra
         if status == 'update':
             # if a document points to the same path exists, replace it
             pkg_col.replace_one({'deb.path': rel_path}, pkg_doc)
-            file_col.delete_many({'deb': pkg_doc['deb']['hash_value']})
+            file_col.delete_many({'deb': pkg_doc['deb']['hash']})
             file_col.insert_many(file_doc)
             I('SCAN', 'UPDATE', rel_path)
         else:
@@ -227,7 +227,9 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection, bra
         try:
             scan_deb(*args)
         except Exception as e:
+            import logging
             E('SCAN', e, 'with', args, file=sys.stderr)
+            logging.exception(e)
             raise
         finally:
             with counter_lock:
@@ -242,7 +244,7 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection, bra
         s = i.stat()
         deb_files[str(i.relative_to(base_dir))] = {
             'size': s.st_size,
-            'mtime': s.st_mtime_ns,
+            'mtime': int(s.st_mtime),
             'status': 'new'
         }
 
