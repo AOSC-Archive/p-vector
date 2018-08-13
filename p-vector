@@ -123,7 +123,7 @@ def prune(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
 
 def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection, branch: str, component: str):
     from concurrent.futures import ThreadPoolExecutor
-    executor = ThreadPoolExecutor(max_workers=1)  # os.cpu_count() + 10)
+    executor = ThreadPoolExecutor(max_workers=os.cpu_count() + 1)
     futures = []
     counter_lock = threading.Lock()
     count = 0
@@ -189,9 +189,13 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection, bra
 
         if status == 'update':
             # if a document points to the same path exists, replace it
-            pkg_col.replace_one({'deb.path': rel_path}, pkg_doc)
-            file_col.delete_many({'deb': pkg_doc['deb']['hash']})
-            file_col.insert_many(file_doc)
+            old_pkg = pkg_col.find_one_and_replace(
+                {'deb.path': rel_path}, pkg_doc, {'_id': False}, upsert=False)
+            if old_pkg is None:
+                pkg_old_col.replace_one({'deb.path': rel_path}, pkg_doc)
+            else:
+                file_col.delete_many({'pkg': pkg_doc['pkg']})
+                file_col.insert_many(file_doc)
             I('SCAN', 'UPDATE', rel_path)
         else:
             # if this is a new document
