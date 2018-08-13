@@ -2,6 +2,7 @@ from datetime import datetime
 
 PROGRESS_BAR_LENGTH = 20
 
+
 def _block_display(v: float, length: int):
     table = ['\u2003', '\u258f', '\u258e', '\u258d', '\u258c', '\u258b', '\u258a', '\u2589', '\u2588']
     blocks_float = length * v
