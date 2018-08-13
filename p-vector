@@ -159,6 +159,34 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection, bra
         p.mtime = mtime
         pkg_doc, file_doc = doc_from_pkg_scan(p)
 
+        '''
+        pkg_doc: meta info of this package
+        file_doc: file list of this package
+        
+        if update in place:
+            pkg_doc (key:deb.path) =replace> [pkg]
+            file_doc (key:deb.hash_value) =replace> [files]
+        else (new deb file):
+            given an index: (name, arch) is unique
+            try to replace an old package or insert in [pkg], put the old one to old_pkg...
+                failed (DuplicateKeyError):
+                    it cannot find the older one and tried to insert itself, but:
+                    if found pkg_doc in pkg:
+                        they have a same version. DUP
+                    else:
+                        this is the oldest one. OLD
+                        insert pkg_doc into [pkg_old]
+                success:
+                    if replaced:
+                        this is the newest one. NEWER
+                        insert file_doc into [files]
+                        insert old_pkg into [pkg_old]
+                    else (inserted):
+                        this is a new package. NEW
+                        insert file_doc into [files]
+                    
+        '''
+
         if status == 'update':
             # if a document points to the same path exists, replace it
             pkg_col.replace_one({'deb.path': rel_path}, pkg_doc)
@@ -177,18 +205,18 @@ def scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection, bra
                 same_ver_pkg = pkg_col.find_one({'pkg': pkg_doc['pkg']})
                 if same_ver_pkg is None:
                     # This one is older, we do nothing. We had better delete it.
-                    W('SCAN', 'OLD   ', pkg_doc['pkg']['arch'], pkg_doc['pkg']['name'], pkg_doc['pkg']['ver'])
                     pkg_old_col.insert_one(pkg_doc)
+                    W('SCAN', 'OLD   ', pkg_doc['pkg']['arch'], pkg_doc['pkg']['name'], pkg_doc['pkg']['ver'])
                 else:
                     E('SCAN', 'DUP   ', rel_path, '==', same_ver_pkg['deb']['path'])
                 return
             if old_pkg is not None:
                 # This one is newer, put the old one into archive, insert this one.
-                I('SCAN', 'NEWER ', pkg_doc['pkg']['arch'], pkg_doc['pkg']['name'],
-                  pkg_doc['pkg']['ver'], '>>', old_pkg['pkg']['ver'])
                 pkg_old_col.insert_one(old_pkg)
                 file_col.delete_many({'pkg': old_pkg['pkg']})
                 file_col.insert_many(file_doc)
+                I('SCAN', 'NEWER ', pkg_doc['pkg']['arch'], pkg_doc['pkg']['name'],
+                  pkg_doc['pkg']['ver'], '>>', old_pkg['pkg']['ver'])
             else:
                 # Completely new package
                 file_col.insert_many(file_doc)
