@@ -289,10 +289,10 @@ def scan(db: Database, base_dir_: str):
             continue
         branch_name = i.name
         print('====', branch_name, '====')
-        for component_dir in PosixPath(pool_dir).joinpath(branch_name).iterdir():
-            if not component_dir.is_dir():
+        for j in PosixPath(pool_dir).joinpath(branch_name).iterdir():
+            if not j.is_dir():
                 continue
-            component_name = component_dir.name
+            component_name = j.name
             pkg_col, pkg_old_col, file_col = get_collections(db, branch_name, component_name)
             print(branch_name, component_name)
             _scan(pkg_col, pkg_old_col, file_col, branch_name, component_name)
