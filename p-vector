@@ -1,23 +1,19 @@
 #!/usr/bin/env python3
 import os
-import subprocess
 import sys
-from datetime import timedelta, timezone
 
 import pymongo
 import yaml
 from pymongo.collection import Collection
 
 sys.path.insert(0, os.path.normpath(os.path.dirname(__file__) + '/../libexec/p-vector'))
-from internal_print import *
 import module_scan
+import module_release
 
 interrupted = False
 
 conf_common = None
 conf_branches = {}
-
-DATETIME_FORMAT = '%a, %d %b %Y %H:%M:%S %z'
 
 
 def check_file_dup(file_col: Collection):
@@ -52,93 +48,6 @@ def check_file_dup(file_col: Collection):
             print(' and', i['count'], 'more')
 
 
-def gen_packages(pkg_col: Collection):
-    cur = pkg_col.find({}, {'_id': 0, 'pkg': 1, 'deb': 1, 'control': 1}).sort([('pkg', pymongo.ASCENDING)])
-
-    with open(base_dir + '/Packages', 'w', encoding='UTF-8') as f:
-        count = 0
-        total = cur.count()
-        for i in cur:
-            i['control']['Filename'] = i['deb']['path']
-            i['control']['Size'] = str(i['deb']['size'])
-            from binascii import hexlify
-            i['control']['SHA256'] = hexlify(i['deb']['hash'])
-            import deb822
-            print(deb822.Deb822(i['control']), file=f)
-            count += 1
-            if count % 100 == 0:
-                progress_bar('Generate Packages', count / total)
-        progress_bar_end('Generate Packages')
-    print('Compress Packages...')
-    subprocess.check_call(['xz', '-k', '-0', '-f', base_dir + '/Packages'])
-
-
-def gen_contents(pkg_col: Collection, file_col: Collection):
-    cur = file_col.find({'is_dir': False}, {'_id': 0, 'pkg.name': 1, 'path': 1}).sort('path')
-    arch = pkg_col.find_one({}, {'pkg.arch': 1})['pkg']['arch']
-    with open(base_dir + '/Contents-' + arch, 'w', encoding='UTF-8') as f:
-        count = 0
-        total = cur.count()
-        for i in cur:
-            path = i['path'][1:]
-            print(path, i['pkg']['name'], file=f)
-            count += 1
-            if count % 50000 == 0:
-                progress_bar('Generate Contents', count / total)
-        progress_bar_end('Generate Contents')
-    print('Compress Contents...')
-    subprocess.check_call(['xz', '-k', '-0', '-f', base_dir + '/Contents-' + arch])
-
-
-def gen_release(pkg_col: Collection):
-    arch = pkg_col.find_one({}, {'pkg.arch': 1})['pkg']['arch']
-    import deb822
-    r = deb822.Release(release_info)
-
-    if 'Architectures' not in r:
-        r['Architectures'] = arch
-
-    def sha256_file(path: str):
-        import Crypto.Hash.SHA256
-        result = Crypto.Hash.SHA256.SHA256Hash()
-        file_size = 0
-        with open(base_dir + '/' + path, 'rb') as file:
-            while True:
-                block = file.read(8192)
-                if len(block) == 0:
-                    break
-                result.update(block)
-                file_size += len(block)
-        return {
-            'sha256': result.hexdigest(),
-            'size': file_size,
-            'name': path
-        }
-
-    now = datetime.now(tz=timezone.utc)
-
-    r['Date'] = now.strftime(DATETIME_FORMAT)
-    r['Valid-Until'] = (now + timedelta(weeks=2)).strftime(DATETIME_FORMAT)
-
-    r['SHA256'] = [
-        sha256_file('Contents-' + arch),
-        sha256_file('Contents-' + arch + '.xz'),
-        sha256_file('Packages'),
-        sha256_file('Packages.xz'),
-    ]
-
-    print('Generate Release...')
-    with open(base_dir + '/Release', 'w', encoding='UTF-8') as f:
-        print(r, file=f)
-
-    print('Sign Release...')
-    subprocess.check_call(
-        ['gpg', '--batch', '--yes', '--clearsign', '-o', base_dir + '/InRelease', base_dir + '/Release'])
-
-    print('Clean Release...')
-    os.remove(base_dir + '/Release')
-
-
 def main():
     if len(sys.argv) != 3:
         print('Usage: %s CONF (scan|release)' % sys.argv[0], file=sys.stderr)
@@ -167,9 +76,12 @@ def main():
 
     db = client['p-vector']
     base_dir = conf_common['path']
+    legacy_dir = conf_common['path_legacy']
 
     if action == 'scan':
         module_scan.scan(db, base_dir)
+    elif action == 'release':
+        module_release.generate(db, base_dir, legacy_dir, conf_common, conf_branches)
 
 
 if __name__ == '__main__':
