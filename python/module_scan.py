@@ -73,7 +73,7 @@ def doc_from_pkg_scan(p):
     return pkg_doc, file_doc
 
 
-def prune(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
+def _prune(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
     delete_list = []
     delete_old_list = []
 
@@ -296,5 +296,8 @@ def scan(db: Database, base_dir_: str):
             pkg_col, pkg_old_col, file_col = get_collections(db, branch_name, component_name)
             print(branch_name, component_name)
             _scan(pkg_col, pkg_old_col, file_col, branch_name, component_name)
+            if interrupted:
+                return
+            _prune(pkg_col, pkg_old_col, file_col)
             if interrupted:
                 return
