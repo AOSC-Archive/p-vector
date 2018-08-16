@@ -233,7 +233,7 @@ def gen_release(db: Database, branch_name: str, component_name_list: list,
     date_format = '%a, %d %b %Y %H:%M:%S %z'
     now = datetime.now(tz=timezone.utc)
     r_template['Date'] = now.strftime(date_format)
-    ttl = 14
+    ttl = int(conf['ttl'])
     r_template['Valid-Until'] = (now + timedelta(days=ttl)).strftime(date_format)
 
     r = r_template.copy()
