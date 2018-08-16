@@ -151,13 +151,27 @@ def _sha256_file(path: str):
     }
 
 
+GPG_MAIN = ''
+
+
+def _get_gpg_proc():
+    global GPG_MAIN
+    if GPG_MAIN == '':
+        try:
+            subprocess.run(['gpg2', '--version'], stdout=subprocess.DEVNULL)
+            GPG_MAIN = 'gpg2'
+        except FileNotFoundError:
+            GPG_MAIN = 'gpg'
+    return GPG_MAIN
+
+
 def _output_and_sign(path: PosixPath, release: deb822.Release):
     print('Generate', path.joinpath('Release'))
     with open(str(path.joinpath('Release')), 'w', encoding='UTF-8') as release_file:
         print(release, file=release_file)
     print('Sign...')
     subprocess.check_call([
-        'gpg', '--batch', '--yes', '--clearsign',
+        _get_gpg_proc(), '--batch', '--yes', '--clearsign',
         '-o', str(path.joinpath('InRelease')),
         str(path.joinpath('Release'))
     ])
