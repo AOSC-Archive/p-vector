@@ -1,3 +1,5 @@
+import time
+
 import zmq
 
 ctx = zmq.Context()
@@ -7,6 +9,7 @@ publisher = ctx.socket(zmq.PUB)
 
 def init():
     publisher.bind(zmq_change)
+    time.sleep(1)
 
 
 def publish_change(comp: str, pkg: str, arch: str, method: str, from_ver: str, to_ver: str):
