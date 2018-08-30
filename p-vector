@@ -7,6 +7,7 @@ import yaml
 from pymongo.collection import Collection
 
 sys.path.insert(0, os.path.normpath(os.path.dirname(__file__) + '/../libexec/p-vector'))
+import module_ipc
 import module_scan
 import module_release
 
@@ -79,6 +80,9 @@ def main():
     legacy_dir = conf_common['path_legacy'] if 'path_legacy' in conf_common else None
 
     if action == 'scan':
+        if 'zmq_change' in conf_common:
+            module_ipc.zmq_change = conf_common['zmq_change']
+        module_ipc.init()
         module_scan.scan(db, base_dir)
     elif action == 'release':
         module_release.generate(db, base_dir, legacy_dir, conf_common, conf_branches)

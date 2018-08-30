@@ -15,6 +15,7 @@ from pymongo.errors import DuplicateKeyError
 
 import internal_dpkg_version
 import internal_pkgscan
+import module_ipc
 from internal_db import get_collections
 from internal_print import *
 
@@ -74,6 +75,7 @@ def doc_from_pkg_scan(p):
 
 
 def _prune(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
+
     delete_list = []
     delete_old_list = []
 
@@ -99,8 +101,17 @@ def _prune(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
     count = 0
     for i in delete_list:
         I('CLEAN', 'CUR   ', i[0])
-        pkg_col.delete_many({'deb.path': i[0]})
+        pkg_doc = pkg_col.find_one_and_delete({'deb.path': i[0]}, {'pkg': 1})
         file_col.delete_many({'pkg': i[1]})
+        if pkg_doc is not None:
+            module_ipc.publish_change(
+                pkg_col.name,
+                pkg_doc['pkg']['name'],
+                pkg_doc['pkg']['arch'],
+                'delete',
+                pkg_doc['pkg']['ver'],
+                '',
+            )
         count += 1
         progress_bar('Prune current', count / total)
 
@@ -191,6 +202,14 @@ def _scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection, br
                 file_col.delete_many({'pkg': pkg_doc['pkg']})
                 file_col.insert_many(file_doc)
             I('SCAN', 'UPDATE', rel_path)
+            module_ipc.publish_change(
+                pkg_col.name,
+                pkg_doc['pkg']['name'],
+                pkg_doc['pkg']['arch'],
+                'overwrite',
+                pkg_doc['pkg']['ver'],
+                pkg_doc['pkg']['ver'],
+            )
         else:
             # if this is a new document
             try:
@@ -215,10 +234,26 @@ def _scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection, br
                 file_col.insert_many(file_doc)
                 I('SCAN', 'NEWER ', pkg_doc['pkg']['arch'], pkg_doc['pkg']['name'],
                   pkg_doc['pkg']['ver'], '>>', old_pkg['pkg']['ver'])
+                module_ipc.publish_change(
+                    pkg_col.name,
+                    pkg_doc['pkg']['name'],
+                    pkg_doc['pkg']['arch'],
+                    'upgrade',
+                    old_pkg['pkg']['ver'],
+                    pkg_doc['pkg']['ver'],
+                )
             else:
                 # Completely new package
                 file_col.insert_many(file_doc)
                 I('SCAN', 'NEW   ', pkg_doc['pkg']['arch'], pkg_doc['pkg']['name'], pkg_doc['pkg']['ver'])
+                module_ipc.publish_change(
+                    pkg_col.name,
+                    pkg_doc['pkg']['name'],
+                    pkg_doc['pkg']['arch'],
+                    'new',
+                    '',
+                    pkg_doc['pkg']['ver'],
+                )
 
     def containment_shell(*args):
         nonlocal count
