@@ -1766,3 +1766,38 @@ class _CaseInsensitiveString(str):
 
 
 _strI = _CaseInsensitiveString
+
+
+def SortPackages(p: Packages):
+    preferred_order = [
+        'Package',
+        'Source',
+        'Version',
+        'Section',
+        'Priority',
+        'Architecture',
+        'Essential',
+        'Installed-Size',
+        'Maintainer',
+        'Homepage',
+        'Built-Using',
+        'Filename',
+        'Size',
+        'SHA256',
+        'SHA1',
+        'MD5',
+    ]
+    new_pkg = Packages()
+    for key in preferred_order:
+        if key in p:
+            new_pkg[key] = p[key]
+            del p[key]
+    keys = [key for key in p]
+    keys.sort()
+    for key in keys:
+        if not key.startswith('Description'):
+            new_pkg[key] = p[key]
+    for key in keys:
+        if key.startswith('Description'):
+            new_pkg[key] = p[key]
+    return new_pkg

@@ -92,7 +92,7 @@ def gen_packages(pkg_col: Collection, pkg_old_col: Collection,
         e['control']['Filename'] = e['deb']['path']
         e['control']['Size'] = str(e['deb']['size'])
         e['control']['SHA256'] = hexlify(e['deb']['hash'])
-        print(deb822.Deb822(e['control']), file=f)
+        print(deb822.SortPackages(deb822.Packages(e['control'])), file=f)
 
     cur = pkg_col.find(
         {}, {'_id': 0, 'pkg': 1, 'deb': 1, 'control': 1}

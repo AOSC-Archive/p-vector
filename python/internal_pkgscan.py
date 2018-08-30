@@ -10,7 +10,7 @@ class PkgInfoWrapper(object):
     p = None
 
     def __init__(self, p):
-        self.control = deb822.Packages(p['control'])
+        self.control = deb822.SortPackages(deb822.Packages(p['control']))
         self.p = p
 
 
