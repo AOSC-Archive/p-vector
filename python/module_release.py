@@ -46,8 +46,8 @@ def generate(db: Database, base_dir: str, legacy_dir: str, conf_common: dict, co
             component_name = j.name
             component_name_list.append(component_name)
             pkg_col, pkg_old_col, file_col = get_collections(db, branch_name, component_name)
-
-            gen_legacy(pkg_col, pkg_old_col, branch_name, component_name, dist_dir, pool_dir, legacy_dir)
+            if legacy_dir is not None:
+                gen_legacy(pkg_col, pkg_old_col, branch_name, component_name, dist_dir, pool_dir, legacy_dir)
             gen_packages(pkg_col, pkg_old_col, branch_name, component_name, dist_dir)
             # gen_contents(file_col, branch_name, component_name, dist_dir)
 
@@ -233,8 +233,9 @@ def gen_release(db: Database, branch_name: str, component_name_list: list,
     date_format = '%a, %d %b %Y %H:%M:%S %z'
     now = datetime.now(tz=timezone.utc)
     r_template['Date'] = now.strftime(date_format)
-    ttl = int(conf['ttl'])
-    r_template['Valid-Until'] = (now + timedelta(days=ttl)).strftime(date_format)
+    if 'ttl' in conf:
+        ttl = int(conf['ttl'])
+        r_template['Valid-Until'] = (now + timedelta(days=ttl)).strftime(date_format)
 
     r = r_template.copy()
 
@@ -257,17 +258,18 @@ def gen_release(db: Database, branch_name: str, component_name_list: list,
     r['SHA256'] = hash_list
     _output_and_sign(branch_dir, r)
 
-    for c in meta_data_list:
-        for a in meta_data_list[c]:
-            target_dir = legacy_path(legacy_dir, branch_name, c, a)
-            r = r_template.copy()
-            r['Architectures'] = a
-            hash_list = []
-            for f in meta_data_list[c][a]:
-                hash_list.append({
-                    'sha256': f['sha256'],
-                    'size': f['size'],
-                    'name': f['path_for_legacy']
-                })
-            r['SHA256'] = hash_list
-            _output_and_sign(target_dir, r)
+    if legacy_dir is not None:
+        for c in meta_data_list:
+            for a in meta_data_list[c]:
+                target_dir = legacy_path(legacy_dir, branch_name, c, a)
+                r = r_template.copy()
+                r['Architectures'] = a
+                hash_list = []
+                for f in meta_data_list[c][a]:
+                    hash_list.append({
+                        'sha256': f['sha256'],
+                        'size': f['size'],
+                        'name': f['path_for_legacy']
+                    })
+                r['SHA256'] = hash_list
+                _output_and_sign(target_dir, r)

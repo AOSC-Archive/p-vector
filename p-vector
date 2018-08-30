@@ -76,7 +76,7 @@ def main():
 
     db = client['p-vector']
     base_dir = conf_common['path']
-    legacy_dir = conf_common['path_legacy']
+    legacy_dir = conf_common['path_legacy'] if 'path_legacy' in conf_common else None
 
     if action == 'scan':
         module_scan.scan(db, base_dir)
