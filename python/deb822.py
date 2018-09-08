@@ -1767,37 +1767,32 @@ class _CaseInsensitiveString(str):
 
 _strI = _CaseInsensitiveString
 
+_package_preferred_order = [
+    'Package',
+    'Source',
+    'Version',
+    'Section',
+    'Priority',
+    'Architecture',
+    'Essential',
+    'Installed-Size',
+    'Maintainer',
+    'Homepage',
+    'Built-Using',
+    'Filename',
+    'Size',
+    'SHA256',
+    'SHA1',
+    'MD5',
+]
+_package_preferred_order_d = {v:k for k, v in enumerate(
+    _package_preferred_order)}
 
 def SortPackages(p: Packages):
-    preferred_order = [
-        'Package',
-        'Source',
-        'Version',
-        'Section',
-        'Priority',
-        'Architecture',
-        'Essential',
-        'Installed-Size',
-        'Maintainer',
-        'Homepage',
-        'Built-Using',
-        'Filename',
-        'Size',
-        'SHA256',
-        'SHA1',
-        'MD5',
-    ]
+    sort_key = lambda k: (
+        10000 if k.startswith('Description')
+        else _package_preferred_order_d.get(k, 100), k)
     new_pkg = Packages()
-    for key in preferred_order:
-        if key in p:
-            new_pkg[key] = p[key]
-            del p[key]
-    keys = [key for key in p]
-    keys.sort()
-    for key in keys:
-        if not key.startswith('Description'):
-            new_pkg[key] = p[key]
-    for key in keys:
-        if key.startswith('Description'):
-            new_pkg[key] = p[key]
+    for key in sorted(p.keys(), key=sort_key):
+        new_pkg[key] = p[key]
     return new_pkg
