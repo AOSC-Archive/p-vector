@@ -33,7 +33,7 @@ def try_create_symlink(base: PosixPath, link_name: str, target: str, is_dir=Fals
 
 
 def generate(db: Database, base_dir: str, legacy_dir: str, conf_common: dict, conf_branches: dict):
-    dist_dir = base_dir + '/dists'
+    dist_dir = base_dir + '/dists.new'
     pool_dir = base_dir + '/pool'
     for i in PosixPath(pool_dir).iterdir():
         if not i.is_dir():
@@ -54,6 +54,11 @@ def generate(db: Database, base_dir: str, legacy_dir: str, conf_common: dict, co
         conf = conf_common.copy()
         conf.update(conf_branches[branch_name])
         gen_release(db, branch_name, component_name_list, dist_dir, legacy_dir, conf)
+    dist_dir_real = base_dir + '/dists'
+    dist_dir_old = base_dir + '/dists.old'
+    os.rename(dist_dir_real, dist_dir_old)
+    os.rename(dist_dir, dist_dir_real)
+    os.removedirs(dist_dir_old)
 
 
 def gen_legacy(pkg_col: Collection, pkg_old_col: Collection,
