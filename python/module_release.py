@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 from binascii import hexlify
 from datetime import timezone, timedelta
@@ -56,9 +57,10 @@ def generate(db: Database, base_dir: str, legacy_dir: str, conf_common: dict, co
         gen_release(db, branch_name, component_name_list, dist_dir, legacy_dir, conf)
     dist_dir_real = base_dir + '/dists'
     dist_dir_old = base_dir + '/dists.old'
-    os.rename(dist_dir_real, dist_dir_old)
+    if PosixPath(dist_dir_real).exists():
+        os.rename(dist_dir_real, dist_dir_old)
     os.rename(dist_dir, dist_dir_real)
-    os.removedirs(dist_dir_old)
+    shutil.rmtree(dist_dir_old, True)
 
 
 def gen_legacy(pkg_col: Collection, pkg_old_col: Collection,
