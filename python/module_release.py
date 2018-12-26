@@ -15,7 +15,7 @@ from internal_print import *
 
 
 def legacy_path(legacy_dir: str, branch_name: str, component_name: str, arch: str):
-    if arch == 'all':
+    if arch in ['all', 'any']:
         arch = 'noarch'
     d = PosixPath(legacy_dir).joinpath('os-' + arch)
     if component_name != 'main':
@@ -89,33 +89,38 @@ def gen_packages(pkg_col: Collection, pkg_old_col: Collection,
     arch_packages = {}
 
     def print_packages_entry(e):
-        arch = e['pkg']['arch']
+        arch = e['pkg']['arch'] if e is not None else 'all'
         if arch not in arch_packages:
             d = PosixPath(dist_dir).joinpath(branch_name).joinpath(component_name).joinpath('binary-' + arch)
             d.mkdir(0o755, parents=True, exist_ok=True)
             arch_packages[arch] = open(str(d.joinpath('Packages')), 'w', encoding='utf-8')
         f = arch_packages[arch]
 
-        e['control']['Filename'] = e['deb']['path']
-        e['control']['Size'] = str(e['deb']['size'])
-        e['control']['SHA256'] = hexlify(e['deb']['hash'])
-        print(deb822.SortPackages(deb822.Packages(e['control'])), file=f)
+        if e is not None:
+            e['control']['Filename'] = e['deb']['path']
+            e['control']['Size'] = str(e['deb']['size'])
+            e['control']['SHA256'] = hexlify(e['deb']['hash'])
+            print(deb822.SortPackages(deb822.Packages(e['control'])), file=f)
 
+    count = 0
     cur = pkg_col.find(
         {}, {'_id': 0, 'pkg': 1, 'deb': 1, 'control': 1}
-    ).sort('pkg.name')
+    ).sort('pkg')
     for p in cur:
+        count += 1
         print_packages_entry(p)
     cur = pkg_old_col.find(
         {}, {'_id': 0, 'pkg': 1, 'deb': 1, 'control': 1}
-    ).sort([('pkg.name', ASCENDING), ('pkg.comp_ver', DESCENDING)])
+    ).sort('pkg')
     for p in cur:
+        count += 1
         print_packages_entry(p)
+    if count == 0:
+        print_packages_entry(None)
     for a in arch_packages:
         file_path = arch_packages[a].name
         arch_packages[a].close()
         subprocess.check_call(['xz', '-k', '-0', '-f', file_path])
-
 
 def gen_contents(file_col: Collection, branch_name: str, component_name: str, dist_dir: str):
     arch_packages = {}
@@ -201,6 +206,8 @@ def gen_release(db: Database, branch_name: str, component_name_list: list,
         pkg_arch = pkg_old_col.aggregate([{'$group': {'_id': '$pkg.arch'}}])
         for a in pkg_arch:
             arch_list.append(a['_id'])
+        if len(arch_list) == 0:
+            arch_list = ['all']
         meta_data_list[component_name] = dict.fromkeys(arch_list)
 
     # Now we have this structure:
@@ -279,4 +286,7 @@ def gen_release(db: Database, branch_name: str, component_name_list: list,
                         'name': f['path_for_legacy']
                     })
                 r['SHA256'] = hash_list
-                _output_and_sign(target_dir, r)
+                try:
+                    _output_and_sign(target_dir, r)
+                except FileNotFoundError:
+                    pass
