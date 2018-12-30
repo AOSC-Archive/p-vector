@@ -77,7 +77,6 @@ def main():
 
     db = client['p-vector']
     base_dir = conf_common['path']
-    legacy_dir = conf_common['path_legacy'] if 'path_legacy' in conf_common else None
 
     if action == 'scan':
         if 'zmq_change' in conf_common:
@@ -85,7 +84,7 @@ def main():
         module_ipc.init()
         module_scan.scan(db, base_dir)
     elif action == 'release':
-        module_release.generate(db, base_dir, legacy_dir, conf_common, conf_branches)
+        module_release.generate(db, base_dir, conf_common, conf_branches)
 
 
 if __name__ == '__main__':

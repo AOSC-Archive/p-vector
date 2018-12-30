@@ -14,18 +14,6 @@ from internal_db import get_collections
 from internal_print import *
 
 
-def legacy_path(legacy_dir: str, branch_name: str, component_name: str, arch: str):
-    if arch in ['all', 'any']:
-        arch = 'noarch'
-    d = PosixPath(legacy_dir).joinpath('os-' + arch)
-    if component_name != 'main':
-        d = d.joinpath(component_name)
-    if branch_name != 'stable':
-        d = d.joinpath(branch_name).joinpath('os-' + arch)
-    d = d.joinpath('os3-dpkg')
-    return d
-
-
 def try_create_symlink(base: PosixPath, link_name: str, target: str, is_dir=False):
     try:
         base.joinpath(link_name).symlink_to(os.path.relpath(target, str(base)), target_is_directory=is_dir)
@@ -33,7 +21,7 @@ def try_create_symlink(base: PosixPath, link_name: str, target: str, is_dir=Fals
         pass
 
 
-def generate(db: Database, base_dir: str, legacy_dir: str, conf_common: dict, conf_branches: dict):
+def generate(db: Database, base_dir: str, conf_common: dict, conf_branches: dict):
     dist_dir = base_dir + '/dists.new'
     pool_dir = base_dir + '/pool'
     for i in PosixPath(pool_dir).iterdir():
@@ -47,41 +35,18 @@ def generate(db: Database, base_dir: str, legacy_dir: str, conf_common: dict, co
             component_name = j.name
             component_name_list.append(component_name)
             pkg_col, pkg_old_col, file_col = get_collections(db, branch_name, component_name)
-            if legacy_dir is not None:
-                gen_legacy(pkg_col, pkg_old_col, branch_name, component_name, dist_dir, pool_dir, legacy_dir)
             gen_packages(pkg_col, pkg_old_col, branch_name, component_name, dist_dir)
             # gen_contents(file_col, branch_name, component_name, dist_dir)
 
         conf = conf_common.copy()
         conf.update(conf_branches[branch_name])
-        gen_release(db, branch_name, component_name_list, dist_dir, legacy_dir, conf)
+        gen_release(db, branch_name, component_name_list, dist_dir, conf)
     dist_dir_real = base_dir + '/dists'
     dist_dir_old = base_dir + '/dists.old'
     if PosixPath(dist_dir_real).exists():
         os.rename(dist_dir_real, dist_dir_old)
     os.rename(dist_dir, dist_dir_real)
     shutil.rmtree(dist_dir_old, True)
-
-
-def gen_legacy(pkg_col: Collection, pkg_old_col: Collection,
-               branch_name: str, component_name: str, dist_dir: str, pool_dir: str, legacy_dir: str):
-    def link_pool(arch):
-        d = legacy_path(legacy_dir, branch_name, component_name, arch)
-        d.mkdir(0o755, parents=True, exist_ok=True)
-        try_create_symlink(d, 'pool', pool_dir, is_dir=True)
-        contents_path = PosixPath(dist_dir).joinpath(branch_name).joinpath(component_name)
-        packages_path = PosixPath(dist_dir).joinpath(branch_name).joinpath(component_name).joinpath('binary-' + arch)
-        try_create_symlink(d, 'Packages', str(packages_path.joinpath('Packages')))
-        try_create_symlink(d, 'Packages.xz', str(packages_path.joinpath('Packages.xz')))
-        try_create_symlink(d, 'Contents-' + arch, str(contents_path.joinpath('Contents-' + arch)))
-        try_create_symlink(d, 'Contents-' + arch + '.xz', str(contents_path.joinpath('Contents-' + arch + '.xz')))
-
-    arch_list = pkg_col.aggregate([{'$group': {'_id': '$pkg.arch'}}])
-    for a in arch_list:
-        link_pool(a['_id'])
-    arch_list = pkg_old_col.aggregate([{'$group': {'_id': '$pkg.arch'}}])
-    for a in arch_list:
-        link_pool(a['_id'])
 
 
 def gen_packages(pkg_col: Collection, pkg_old_col: Collection,
@@ -191,7 +156,7 @@ def _output_and_sign(path: PosixPath, release: deb822.Release):
 
 
 def gen_release(db: Database, branch_name: str, component_name_list: list,
-                dist_dir: str, legacy_dir: str, conf: dict):
+                dist_dir: str, conf: dict):
     branch_dir = PosixPath(dist_dir).joinpath(branch_name)
     if not branch_dir.exists():
         return
@@ -271,22 +236,3 @@ def gen_release(db: Database, branch_name: str, component_name_list: list,
                 })
     r['SHA256'] = hash_list
     _output_and_sign(branch_dir, r)
-
-    if legacy_dir is not None:
-        for c in meta_data_list:
-            for a in meta_data_list[c]:
-                target_dir = legacy_path(legacy_dir, branch_name, c, a)
-                r = r_template.copy()
-                r['Architectures'] = a
-                hash_list = []
-                for f in meta_data_list[c][a]:
-                    hash_list.append({
-                        'sha256': f['sha256'],
-                        'size': f['size'],
-                        'name': f['path_for_legacy']
-                    })
-                r['SHA256'] = hash_list
-                try:
-                    _output_and_sign(target_dir, r)
-                except FileNotFoundError:
-                    pass
