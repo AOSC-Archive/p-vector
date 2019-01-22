@@ -6,7 +6,7 @@ from pymongo.database import Database
 
 def get_collections(db: Database, branch: str, component: str, init: bool = False) -> (
 Collection, Collection, Collection):
-    col_name = '%s/%s' % (branch, component)
+    col_name = '%s-%s' % (branch, component)
     pkg_col = db[col_name]
     if init:
         pkg_col.create_index([('deb.hash', pymongo.ASCENDING)], unique=True)
