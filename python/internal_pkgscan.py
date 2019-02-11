@@ -1,5 +1,6 @@
-import json
 import os
+import json
+import subprocess
 
 import deb822
 
@@ -15,7 +16,7 @@ class PkgInfoWrapper(object):
 
 
 def scan(path: str):
-    import subprocess
-    result = subprocess.check_output([os.path.dirname(__file__) + '/pkgscan_cli', path],
-                                     stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    result = subprocess.check_output(
+        [os.path.dirname(__file__) + '/pkgscan_cli', path],
+        stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return PkgInfoWrapper(json.loads(result.decode('utf-8')))

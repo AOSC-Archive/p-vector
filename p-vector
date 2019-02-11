@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 import os
 import sys
+import sqlite3
 
-import pymongo
 import yaml
-from pymongo.collection import Collection
 
 sys.path.insert(0, os.path.normpath(os.path.dirname(__file__) + '/../libexec/p-vector'))
 import module_ipc
@@ -17,7 +16,7 @@ conf_common = None
 conf_branches = {}
 
 
-def check_file_dup(file_col: Collection):
+def check_file_dup(db: sqlite3.Connection):
     cur = file_col.aggregate([
 
         {'$match': {'is_dir': False}},  # Exclude directories
@@ -66,16 +65,7 @@ def main():
                 continue
             conf_branches[i['branch']] = i
 
-    try:
-        client = pymongo.MongoClient(
-            conf_common['db_conn'],
-            appname='p-vector', ssl_ca_certs=conf_common['db_conn_cert'])
-    except KeyError:
-        client = pymongo.MongoClient(
-            conf_common['db_conn'],
-            appname='p-vector')
-
-    db = client['p-vector']
+    db = sqlite3.connect(conf_common['db_sqlite'])
     base_dir = conf_common['path']
 
     if action == 'scan':
