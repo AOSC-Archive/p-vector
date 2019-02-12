@@ -16,10 +16,6 @@ import internal_db
 import internal_pkgscan
 import internal_dpkg_version
 
-logging.basicConfig(
-    format='%(asctime)s %(levelname).1s [%(name)5.5s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
-
 logger_scan = logging.getLogger('SCAN')
 
 FILETYPES = {

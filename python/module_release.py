@@ -3,6 +3,7 @@ import json
 import gzip
 import shutil
 import sqlite3
+import logging
 import datetime
 import subprocess
 from pathlib import PosixPath, PurePath
@@ -10,6 +11,7 @@ from pathlib import PosixPath, PurePath
 import deb822
 from internal_pkgscan import sha256_file
 
+logger_rel = logging.getLogger('REL')
 
 def generate(db: sqlite3.Connection, base_dir: str,
              conf_common: dict, conf_branches: dict):
@@ -25,11 +27,14 @@ def generate(db: sqlite3.Connection, base_dir: str,
                 continue
             component_name = j.name
             component_name_list.append(component_name)
+            logger_rel.info('Generating Packages for %s-%s', branch_name, component_name)
             gen_packages(db, dist_dir, branch_name, component_name)
+            logger_rel.info('Generating Contents for %s-%s', branch_name, component_name)
             gen_contents(db, branch_name, component_name, dist_dir)
 
         conf = conf_common.copy()
         conf.update(conf_branches[branch_name])
+        logger_rel.info('Generating Release for %s', branch_name)
         gen_release(db, branch_name, component_name_list, dist_dir, conf)
     dist_dir_real = base_dir + '/dists'
     dist_dir_old = base_dir + '/dists.old'
@@ -97,19 +102,6 @@ def gen_contents(db: sqlite3.Connection,
 
 GPG_MAIN = os.environ.get('GPG', shutil.which('gpg2')) or shutil.which('gpg')
 
-def _output_and_sign(path: PosixPath, release: deb822.Release):
-    release_file = path.joinpath('Release')
-    print('Generate', )
-    with open(str(release_file), 'w', encoding='UTF-8') as release_file:
-        print(release, file=release_file)
-    print('Sign...')
-    subprocess.check_call([
-        GPG_MAIN, '--batch', '--yes', '--clearsign',
-        '-o', str(path.joinpath('InRelease')), str(release_file)
-    ])
-    release_file.unlink()
-
-
 def gen_release(db: sqlite3.Connection, branch_name: str,
                 component_name_list: list, dist_dir: str, conf: dict):
     branch_dir = PosixPath(dist_dir).joinpath(branch_name)
@@ -168,10 +160,8 @@ def gen_release(db: sqlite3.Connection, branch_name: str,
                 })
     r['SHA256'] = hash_list
     release_fn = branch_dir.joinpath('Release')
-    print('Generate')
     with open(str(release_fn), 'w', encoding='UTF-8') as f:
         f.write(str(r))
-    print('Sign...')
     subprocess.check_call([
         GPG_MAIN, '--batch', '--yes', '--clearsign',
         '-o', str(path.joinpath('InRelease')), str(release_fn)
