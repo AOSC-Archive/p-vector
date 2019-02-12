@@ -17,7 +17,15 @@ def init_db(db: sqlite3.Connection):
     cur.execute('PRAGMA journal_mode=WAL')
     cur.execute('PRAGMA application_id=1886807395')
     cur.execute('PRAGMA case_sensitive_like=1')
-    cur.execute('CREATE TABLE IF NOT EXISTS dpkg_packages ('
+    cur.execute('CREATE TABLE IF NOT EXISTS pv_repos ('
+                'name TEXT PRIMARY KEY,' # key: bsp-sunxi-armel/testing
+                'realname TEXT,'     # group key: amd64, bsp-sunxi-armel
+                'path TEXT,'         # testing/main
+                'branch TEXT,'       # stable, testing, explosive
+                'component TEXT,'    # main, bsp-sunxi, opt-avx2
+                'architecture TEXT'  # amd64, all
+                ')')
+    cur.execute('CREATE TABLE IF NOT EXISTS pv_packages ('
                 'package TEXT,'
                 'version TEXT,'
                 'repo TEXT,'
@@ -30,7 +38,7 @@ def init_db(db: sqlite3.Connection):
                 'control TEXT,'
                 'PRIMARY KEY (package, version, repo)'
                 ')')
-    cur.execute('CREATE TABLE IF NOT EXISTS dpkg_package_duplicate ('
+    cur.execute('CREATE TABLE IF NOT EXISTS pv_package_duplicate ('
                 'package TEXT,'
                 'version TEXT,'
                 'repo TEXT,'
@@ -43,7 +51,7 @@ def init_db(db: sqlite3.Connection):
                 'control TEXT,'
                 'PRIMARY KEY (filename)'
                 ')')
-    cur.execute('CREATE TABLE IF NOT EXISTS dpkg_package_sodep ('
+    cur.execute('CREATE TABLE IF NOT EXISTS pv_package_sodep ('
                 'package TEXT,'
                 'version TEXT,'
                 'repo TEXT,'
@@ -52,7 +60,7 @@ def init_db(db: sqlite3.Connection):
                 'ver TEXT'
                 # 'PRIMARY KEY (package, version, repo, depends, name)'
                 ')')
-    cur.execute('CREATE TABLE IF NOT EXISTS dpkg_package_files ('
+    cur.execute('CREATE TABLE IF NOT EXISTS pv_package_files ('
                 'package TEXT,'
                 'version TEXT,'
                 'repo TEXT,'
@@ -67,22 +75,22 @@ def init_db(db: sqlite3.Connection):
                 'gname TEXT'
                 # 'PRIMARY KEY (package, version, repo, path, name)'
                 ')')
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_dpkg_packages_filename'
-                ' ON dpkg_packages (filename)')
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_dpkg_package_duplicate_package'
-                ' ON dpkg_package_duplicate (package, version, repo)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_path'
+                ' ON pv_repos (path, architecture)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_duplicate_package'
+                ' ON pv_package_duplicate (package, version, repo)')
     db.commit()
     cur.close()
 
 def init_index(db: sqlite3.Connection):
     cur = db.cursor()
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_dpkg_package_sodep_package'
-                ' ON dpkg_package_sodep (package, version, repo)')
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_dpkg_package_sodep_name'
-                ' ON dpkg_package_sodep (name)')
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_dpkg_package_files_package'
-                ' ON dpkg_package_files (package, version, repo)')
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_dpkg_package_files_path_name'
-                ' ON dpkg_package_files (path, name)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_sodep_package'
+                ' ON pv_package_sodep (package, version, repo)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_sodep_name'
+                ' ON pv_package_sodep (name)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_files_package'
+                ' ON pv_package_files (package, version, repo)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_files_path_name'
+                ' ON pv_package_files (path, name)')
     db.commit()
     cur.close()

@@ -94,18 +94,22 @@ def scan_dir(db: sqlite3.Connection, base_dir: str, branch: str, component: str)
     pool_path = PosixPath(base_dir).joinpath('pool')
     search_path = pool_path.joinpath(branch).joinpath(component)
     compname = '%s-%s' % (branch, component)
-    sql_search_path = os.path.join('pool', branch, component) + '/%'
+    comppath = '%s/%s' % (branch, component)
     cur = db.cursor()
-    cur.execute(
-        "SELECT package, version, repo, architecture, filename, size, mtime "
-        "FROM dpkg_packages WHERE filename LIKE ? UNION ALL "
-        "SELECT package, version, repo, architecture, filename, size, mtime "
-        "FROM dpkg_package_duplicate WHERE filename LIKE ?",
-        (sql_search_path, sql_search_path))
+    cur.execute("""SELECT p.package, p.version, p.repo, p.architecture,
+          p.filename, p.size, p.mtime
+        FROM pv_packages p
+        INNER JOIN pv_repos r ON p.repo=r.name WHERE r.path=?
+        UNION ALL
+        SELECT p.package, p.version, p.repo, p.architecture,
+          p.filename, p.size, p.mtime
+        FROM pv_package_duplicate p
+        INNER JOIN pv_repos r ON p.repo=r.name WHERE r.path=?""",
+        (comppath, comppath))
     dup_pkgs = set()
     ignore_files = set()
     del_list = []
-    for package, version, repo, architecture, filename, size, mtime in cur:
+    for package, version, repopath, architecture, filename, size, mtime in cur:
         fullpath = PosixPath(base_dir).joinpath(filename)
         if fullpath.is_file():
             stat = fullpath.stat()
@@ -114,17 +118,17 @@ def scan_dir(db: sqlite3.Connection, base_dir: str, branch: str, component: str)
             else:
                 dup_pkgs.add(filename)
         else:
-            del_list.append((filename, package, version, repo))
+            del_list.append((filename, package, version, repopath))
             logger_scan.info('CLEAN  %s', filename)
             module_ipc.publish_change(
                 compname, package, architecture, 'delete', version, '')
     for row in del_list:
-        cur.execute("DELETE FROM dpkg_package_sodep "
+        cur.execute("DELETE FROM pv_package_sodep "
             "WHERE package=? AND version=? AND repo=?", row[1:])
-        cur.execute("DELETE FROM dpkg_package_files "
+        cur.execute("DELETE FROM pv_package_files "
             "WHERE package=? AND version=? AND repo=?", row[1:])
-        cur.execute("DELETE FROM dpkg_packages WHERE filename=?", (row[0],))
-        cur.execute("DELETE FROM dpkg_package_duplicate WHERE filename=?", (row[0],))
+        cur.execute("DELETE FROM pv_packages WHERE filename=?", (row[0],))
+        cur.execute("DELETE FROM pv_package_duplicate WHERE filename=?", (row[0],))
     #check_list = [[] for _ in range(4)]
     check_list = []
     for fullpath in search_path.rglob('*.deb'):
@@ -143,12 +147,14 @@ def scan_dir(db: sqlite3.Connection, base_dir: str, branch: str, component: str)
     del ignore_files
     with multiprocessing.dummy.Pool(os.cpu_count() + 1) as mpool:
         for pkginfo, sodeps, files in mpool.imap_unordered(scan_deb, check_list, 8):
-            arch = pkginfo['architecture']
-            if arch == 'all':
-                arch = 'noarch'
-            repo = '%s/%s' % (arch, branch)
+            realname = pkginfo['architecture']
+            if realname == 'all':
+                realname = 'noarch'
             if component != 'main':
-                repo = component + '-' + repo
+                realname = component + '-' + realname
+            repo = '%s/%s' % (realname, branch)
+            cur.execute("INSERT OR IGNORE INTO pv_repos VALUES (?,?,?,?,?,?)",
+                (repo, realname, comppath, branch, component, pkginfo['architecture']))
             pkginfo['repo'] = repo
             dbkey = (pkginfo['package'], pkginfo['version'], repo)
             if pkginfo['filename'] in dup_pkgs:
@@ -158,7 +164,7 @@ def scan_dir(db: sqlite3.Connection, base_dir: str, branch: str, component: str)
                     'overwrite', pkginfo['version'], pkginfo['version']
                 )
             else:
-                cur.execute("SELECT version, filename FROM dpkg_packages "
+                cur.execute("SELECT version, filename FROM pv_packages "
                     "WHERE package=? AND repo=?", (pkginfo['package'], repo))
                 results = cur.fetchall()
                 if results:
@@ -178,16 +184,16 @@ def scan_dir(db: sqlite3.Connection, base_dir: str, branch: str, component: str)
                             pkginfo['architecture'], pkginfo['package'],
                             pkginfo['version'])
                     else:
-                        cur.execute("DELETE FROM dpkg_package_sodep "
+                        cur.execute("DELETE FROM pv_package_sodep "
                             "WHERE package=? AND version=? AND repo=?", dbkey)
-                        cur.execute("DELETE FROM dpkg_package_files "
+                        cur.execute("DELETE FROM pv_package_files "
                             "WHERE package=? AND version=? AND repo=?", dbkey)
-                        cur.execute("DELETE FROM dpkg_package_duplicate "
+                        cur.execute("DELETE FROM pv_package_duplicate "
                             "WHERE package=? AND version=? AND repo=?", dbkey)
-                        cur.execute("INSERT INTO dpkg_package_duplicate "
-                            "SELECT * FROM dpkg_packages WHERE filename=?",
+                        cur.execute("INSERT INTO pv_package_duplicate "
+                            "SELECT * FROM pv_packages WHERE filename=?",
                             (oldver[1],))
-                        cur.execute("DELETE FROM dpkg_packages "
+                        cur.execute("DELETE FROM pv_packages "
                             "WHERE package=? AND version=? AND repo=?", dbkey)
                         logger_scan.error('DUP    %s == %s',
                             oldver[1], pkginfo['filename'])
@@ -199,13 +205,13 @@ def scan_dir(db: sqlite3.Connection, base_dir: str, branch: str, component: str)
                         'new', '', pkginfo['version']
                     )
             keys, qms, vals = internal_db.make_insert(pkginfo)
-            cur.execute("INSERT INTO dpkg_packages (%s) VALUES (%s)" %
+            cur.execute("INSERT INTO pv_packages (%s) VALUES (%s)" %
                 (keys, qms), vals)
             for row in sodeps:
-                cur.execute("INSERT INTO dpkg_package_sodep VALUES "
+                cur.execute("INSERT INTO pv_package_sodep VALUES "
                     "(?,?,?,?,?,?)", dbkey + row)
             for row in files:
-                cur.execute("INSERT INTO dpkg_package_files VALUES "
+                cur.execute("INSERT INTO pv_package_files VALUES "
                     "(?,?,?,?,?,?,?,?,?,?,?,?)", dbkey + row)
 
 def scan(db: sqlite3.Connection, base_dir: str):
