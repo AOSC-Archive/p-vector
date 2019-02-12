@@ -17,6 +17,7 @@ def generate(db: sqlite3.Connection, base_dir: str,
              conf_common: dict, conf_branches: dict):
     dist_dir = base_dir + '/dists.new'
     pool_dir = base_dir + '/pool'
+    db.execute('PRAGMA case_sensitive_like=1')
     for i in PosixPath(pool_dir).iterdir():
         if not i.is_dir():
             continue
@@ -92,7 +93,7 @@ def gen_contents(db: sqlite3.Connection,
             FROM dpkg_packages dp
             INNER JOIN dpkg_package_files df USING (package, version, repo)
             WHERE dp.filename LIKE ? AND df.ftype='reg'
-            AND (dp.architecture=? OR dp.architecture='all')
+            AND dp.architecture IN (?, 'all')
             GROUP BY df.path, df.name""", (search_path, arch))
         filename = str(basedir.joinpath('Contents-%s.gz' % arch))
         with gzip.open(filename, 'wb', 9) as f:
