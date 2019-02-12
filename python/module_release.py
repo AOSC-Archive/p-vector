@@ -11,7 +11,7 @@ from pathlib import PosixPath, PurePath
 import deb822
 
 
-def generate(db: sqlite3.Database, base_dir: str,
+def generate(db: sqlite3.Connection, base_dir: str,
              conf_common: dict, conf_branches: dict):
     dist_dir = base_dir + '/dists.new'
     pool_dir = base_dir + '/pool'
@@ -121,7 +121,7 @@ def _output_and_sign(path: PosixPath, release: deb822.Release):
     release_file.unlink()
 
 
-def gen_release(db: sqlite3.Database, branch_name: str,
+def gen_release(db: sqlite3.Connection, branch_name: str,
                 component_name_list: list, dist_dir: str, conf: dict):
     branch_dir = PosixPath(dist_dir).joinpath(branch_name)
     if not branch_dir.exists():

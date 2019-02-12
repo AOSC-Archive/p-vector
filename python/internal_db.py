@@ -36,8 +36,8 @@ def init_db(db: sqlite3.Connection):
                 'repo TEXT,'
                 'depends INTEGER,' # 0 provides, 1 depends
                 'name TEXT,'
-                'ver TEXT,'
-                'PRIMARY KEY (package, version, repo, deptype, name)'
+                'ver TEXT'
+                # 'PRIMARY KEY (package, version, repo, depends, name)'
                 ')')
     cur.execute('CREATE TABLE IF NOT EXISTS dpkg_package_files ('
                 'package TEXT,'
@@ -56,6 +56,8 @@ def init_db(db: sqlite3.Connection):
                 ')')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_dpkg_packages_filename'
                 ' ON dpkg_packages (filename)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_dpkg_package_sodep_package'
+                ' ON dpkg_package_sodep (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_dpkg_package_sodep_name'
                 ' ON dpkg_package_sodep (name)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_dpkg_package_files_package'

@@ -70,7 +70,8 @@ def scan_deb(fullpath: str, filename: str, size: int, mtime: int):
         path, name = os.path.split(os.path.normpath(
             os.path.join('/', row['path'])))
         files.append((
-            path.lstrip('/'), name, row['size'], FILETYPES[row['type']],
+            path.lstrip('/'), name, row['size'],
+            FILETYPES.get(row['type'], str(row['type'])),
             row['perm'], row['uid'], row['gid'], row['uname'], row['gname']
         ))
     return pkginfo, sodeps, files
@@ -87,7 +88,7 @@ def scan_dir(db: sqlite3.Connection, base_dir: str, branch: str, component: str)
     cur.execute(
         "SELECT package, version, repo, architecture, filename, size, mtime "
         "FROM dpkg_packages WHERE filename LIKE ?",
-        (os.path.join('pool', branch, component) + '/'))
+        (os.path.join('pool', branch, component) + '/',))
     dup_pkgs = set()
     ignore_files = set()
     del_list = []
