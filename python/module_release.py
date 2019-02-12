@@ -83,7 +83,7 @@ def gen_contents(db: sqlite3.Connection,
     for arch in allarch:
         cur.execute("""
             SELECT df.path || '/' || df.name AS f, group_concat(DISTINCT (
-              json_extract(dp.content, '$.Section') || '/' || dp.package)) AS p
+              json_extract(dp.control, '$.Section') || '/' || dp.package)) AS p
             FROM dpkg_packages dp
             INNER JOIN dpkg_package_files df USING (package, version, repo)
             WHERE dp.filename LIKE ? AND df.ftype='reg'
