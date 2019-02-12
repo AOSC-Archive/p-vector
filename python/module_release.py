@@ -87,7 +87,7 @@ def gen_contents(db: sqlite3.Connection,
             FROM dpkg_packages dp
             INNER JOIN dpkg_package_files df USING (package, version, repo)
             WHERE dp.filename LIKE ? AND df.ftype='reg'
-            AND (df.architecture=? OR df.architecture='all')
+            AND (dp.architecture=? OR dp.architecture='all')
             GROUP BY df.path, df.name""", (search_path, arch))
         filename = str(basedir.joinpath('Contents-%s.gz' % arch))
         with gzip.open(filename, 'wb', 9) as f:
