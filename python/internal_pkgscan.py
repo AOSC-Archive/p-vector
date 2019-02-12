@@ -1,5 +1,6 @@
 import os
 import json
+import hashlib
 import subprocess
 
 import deb822
@@ -20,3 +21,14 @@ def scan(path: str):
         [os.path.dirname(__file__) + '/pkgscan_cli', path],
         stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return PkgInfoWrapper(json.loads(result.decode('utf-8')))
+
+
+def sha256_file(path: str):
+    result = hashlib.new('sha256')
+    with open(path, 'rb') as f:
+        while True:
+            block = f.read(8192)
+            if not block:
+                break
+            result.update(block)
+    return result.hexdigest()

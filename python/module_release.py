@@ -9,6 +9,7 @@ import subprocess
 from pathlib import PosixPath, PurePath
 
 import deb822
+from internal_pkgscan import sha256_file
 
 
 def generate(db: sqlite3.Connection, base_dir: str,
@@ -95,17 +96,6 @@ def gen_contents(db: sqlite3.Connection,
                 f.write((path.ljust(55) + ' ' + package + '\n').encode('utf-8'))
 
 
-def _sha256_file(path: str):
-    result = hashlib.new('sha256')
-    with open(path, 'rb') as f:
-        while True:
-            block = f.read(8192)
-            if not block:
-                break
-            result.update(block)
-    return result.hexdigest()
-
-
 GPG_MAIN = os.environ.get('GPG', shutil.which('gpg2')) or shutil.which('gpg')
 
 def _output_and_sign(path: PosixPath, release: deb822.Release):
@@ -173,7 +163,7 @@ def gen_release(db: sqlite3.Connection, branch_name: str,
                 except FileNotFoundError:
                     continue
                 hash_list.append({
-                    'sha256': _sha256_file(str(path)),
+                    'sha256': sha256_file(str(path)),
                     'size': size,
                     'name': PurePath(c).joinpath(filename)
                 })

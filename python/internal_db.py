@@ -54,6 +54,11 @@ def init_db(db: sqlite3.Connection):
                 'gname TEXT'
                 # 'PRIMARY KEY (package, version, repo, path, name)'
                 ')')
+    db.commit()
+    cur.close()
+
+def init_index(db: sqlite3.Connection):
+    cur = db.cursor()
     cur.execute('CREATE INDEX IF NOT EXISTS idx_dpkg_packages_filename'
                 ' ON dpkg_packages (filename)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_dpkg_package_sodep_package'

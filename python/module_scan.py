@@ -7,7 +7,8 @@ import logging
 import binascii
 import functools
 import collections
-import concurrent.futures
+import urllib.parse
+import multiprocessing.dummy
 from subprocess import CalledProcessError
 
 import module_ipc
@@ -38,14 +39,28 @@ def split_soname(s: str):
     else:
         return spl[0]+'.so', spl[1]
 
-def scan_deb(fullpath: str, filename: str, size: int, mtime: int):
+def parse_debname(s: str):
+    basename = os.path.splitext(os.path.basename(s))[0]
+    package, other = basename.split('_', 1)
+    version, arch = other.rsplit('_', 1)
+    return package, version, arch
+
+def scan_deb(args):
+    # fullpath: str, filename: str, size: int, mtime: int
     # Scan it.
+    fullpath, filename, size, mtime = args
     try:
         p = internal_pkgscan.scan(fullpath)
     except CalledProcessError as e:
         if e.returncode in (1, 2):
             logger_scan.error('%s is corrupted, status: %d', fullpath, e.returncode)
-            return
+            package, version, arch = parse_debname(filename)
+            pkginfo = {
+                'package': package, 'version': version, 'architecture': arch,
+                'filename': filename, 'size': size, 'mtime': mtime,
+                'sha256': internal_pkgscan.sha256_file(fullpath)
+            }
+            return pkginfo, sodeps, files
         raise
     # Make a new document
     pkginfo = {
@@ -80,7 +95,6 @@ dpkg_vercomp_key = functools.cmp_to_key(
     internal_dpkg_version.dpkg_version_compare)
 
 def scan_dir(db: sqlite3.Connection, base_dir: str, branch: str, component: str):
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() + 1)
     pool_path = PosixPath(base_dir).joinpath('pool')
     search_path = pool_path.joinpath(branch).joinpath(component)
     compname = '%s-%s' % (branch, component)
@@ -99,7 +113,6 @@ def scan_dir(db: sqlite3.Connection, base_dir: str, branch: str, component: str)
             if size == stat.st_size and mtime == int(stat.st_mtime):
                 ignore_files.add(str(fullpath))
             else:
-                #dup_pkgs[filename] = (package, version, architecture)
                 dup_pkgs.add(filename)
         else:
             del_list.append((filename, package, version, repo))
@@ -112,23 +125,25 @@ def scan_dir(db: sqlite3.Connection, base_dir: str, branch: str, component: str)
         cur.execute("DELETE FROM dpkg_package_files "
             "WHERE package=? AND version=? AND repo=?", row[1:])
         cur.execute("DELETE FROM dpkg_packages WHERE filename=?", (row[0],))
-    check_list = [[] for _ in range(4)]
+    #check_list = [[] for _ in range(4)]
+    check_list = []
     for fullpath in search_path.rglob('*.deb'):
         if not fullpath.is_file():
             continue
         stat = fullpath.stat()
         sfullpath = str(fullpath)
         if sfullpath in ignore_files:
-            ignore_files.remove(sfullpath)
             continue
-        check_list[0].append(sfullpath)
-        check_list[1].append(str(fullpath.relative_to(base_dir)))
-        check_list[2].append(stat.st_size)
-        check_list[3].append(int(stat.st_mtime))
-        #check_list.append((sfullpath, str(fullpath.relative_to(base_dir)),
-        #    stat.st_size, int(stat.st_mtime)))
-    with executor:
-        for pkginfo, sodeps, files in executor.map(scan_deb, *check_list):
+        #check_list[0].append(sfullpath)
+        #check_list[1].append(str(fullpath.relative_to(base_dir)))
+        #check_list[2].append(stat.st_size)
+        #check_list[3].append(int(stat.st_mtime))
+        check_list.append((sfullpath, str(fullpath.relative_to(base_dir)),
+                           stat.st_size, int(stat.st_mtime)))
+    del ignore_files
+    futures = []
+    with multiprocessing.dummy.Pool(os.cpu_count() + 1) as mpool:
+        for pkginfo, sodeps, files in mpool.imap_unordered(scan_deb, check_list, 8):
             arch = pkginfo['architecture']
             if arch == 'all':
                 arch = 'noarch'
@@ -206,4 +221,5 @@ def scan(db: sqlite3.Connection, base_dir: str):
             finally:
                 db.commit()
             logger_scan.info('==== %s-%s ====', branch_name, component_name)
-    db.execute('PRAGMA optimize')
+    internal_db.init_index(db)
+    db.execute('ANALYZE')
