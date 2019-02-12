@@ -98,11 +98,14 @@ def scan_dir(db: sqlite3.Connection, base_dir: str, branch: str, component: str)
     pool_path = PosixPath(base_dir).joinpath('pool')
     search_path = pool_path.joinpath(branch).joinpath(component)
     compname = '%s-%s' % (branch, component)
+    sql_search_path = os.path.join('pool', branch, component) + '/%'
     cur = db.cursor()
     cur.execute(
         "SELECT package, version, repo, architecture, filename, size, mtime "
-        "FROM dpkg_packages WHERE filename LIKE ?",
-        (os.path.join('pool', branch, component) + '/%',))
+        "FROM dpkg_packages WHERE filename LIKE ? UNION ALL "
+        "SELECT package, version, repo, architecture, filename, size, mtime "
+        "FROM dpkg_package_duplicate WHERE filename LIKE ?",
+        (sql_search_path, sql_search_path))
     dup_pkgs = set()
     ignore_files = set()
     del_list = []
