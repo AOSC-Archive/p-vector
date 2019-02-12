@@ -2,7 +2,6 @@ import os
 import json
 import gzip
 import shutil
-import hashlib
 import sqlite3
 import datetime
 import subprocess

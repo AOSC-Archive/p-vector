@@ -40,7 +40,7 @@ def split_soname(s: str):
         return spl[0]+'.so', spl[1]
 
 def parse_debname(s: str):
-    basename = os.path.splitext(os.path.basename(s))[0]
+    basename = urllib.parse.unquote(os.path.splitext(os.path.basename(s))[0])
     package, other = basename.split('_', 1)
     version, arch = other.rsplit('_', 1)
     return package, version, arch
@@ -60,7 +60,7 @@ def scan_deb(args):
                 'filename': filename, 'size': size, 'mtime': mtime,
                 'sha256': internal_pkgscan.sha256_file(fullpath)
             }
-            return pkginfo, sodeps, files
+            return pkginfo, [], []
         raise
     # Make a new document
     pkginfo = {
@@ -141,7 +141,6 @@ def scan_dir(db: sqlite3.Connection, base_dir: str, branch: str, component: str)
         check_list.append((sfullpath, str(fullpath.relative_to(base_dir)),
                            stat.st_size, int(stat.st_mtime)))
     del ignore_files
-    futures = []
     with multiprocessing.dummy.Pool(os.cpu_count() + 1) as mpool:
         for pkginfo, sodeps, files in mpool.imap_unordered(scan_deb, check_list, 8):
             arch = pkginfo['architecture']
