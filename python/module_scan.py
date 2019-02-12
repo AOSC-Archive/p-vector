@@ -102,7 +102,7 @@ def scan_dir(db: sqlite3.Connection, base_dir: str, branch: str, component: str)
     cur.execute(
         "SELECT package, version, repo, architecture, filename, size, mtime "
         "FROM dpkg_packages WHERE filename LIKE ?",
-        (os.path.join('pool', branch, component) + '/',))
+        (os.path.join('pool', branch, component) + '/%',))
     dup_pkgs = set()
     ignore_files = set()
     del_list = []
@@ -215,10 +215,10 @@ def scan(db: sqlite3.Connection, base_dir: str):
             if not j.is_dir():
                 continue
             component_name = j.name
+            logger_scan.info('==== %s-%s ====', branch_name, component_name)
             try:
                 scan_dir(db, base_dir, branch_name, component_name)
             finally:
                 db.commit()
-            logger_scan.info('==== %s-%s ====', branch_name, component_name)
     internal_db.init_index(db)
     db.execute('ANALYZE')

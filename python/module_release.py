@@ -41,7 +41,7 @@ def generate(db: sqlite3.Connection, base_dir: str,
 
 def gen_packages(db: sqlite3.Connection, dist_dir: str,
                  branch_name: str, component_name: str):
-    search_path = os.path.join('pool', branch_name, component_name) + '/'
+    search_path = os.path.join('pool', branch_name, component_name) + '/%'
     basedir = PosixPath(dist_dir).joinpath(branch_name).joinpath(component_name)
     d = basedir.joinpath('binary-all')
     d.mkdir(0o755, parents=True, exist_ok=True)
@@ -71,7 +71,7 @@ def gen_packages(db: sqlite3.Connection, dist_dir: str,
 
 def gen_contents(db: sqlite3.Connection,
                  branch_name: str, component_name: str, dist_dir: str):
-    search_path = os.path.join('pool', branch_name, component_name) + '/'
+    search_path = os.path.join('pool', branch_name, component_name) + '/%'
     basedir = PosixPath(dist_dir).joinpath(branch_name).joinpath(component_name)
     basedir.mkdir(0o755, parents=True, exist_ok=True)
     cur = db.cursor()
@@ -121,7 +121,7 @@ def gen_release(db: sqlite3.Connection, branch_name: str,
     for component_name in component_name_list:
         cur.execute("SELECT DISTINCT architecture "
             "FROM dpkg_packages WHERE filename LIKE ?",
-            (os.path.join('pool', branch_name, component_name) + '/'))
+            (os.path.join('pool', branch_name, component_name) + '/%'))
         meta_data_list[component_name] = [r[0] for r in cur] or ['all']
     cur.close()
     # Now we have this structure:
