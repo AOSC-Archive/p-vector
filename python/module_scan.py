@@ -125,6 +125,7 @@ def scan_dir(db: sqlite3.Connection, base_dir: str, branch: str, component: str)
         cur.execute("DELETE FROM dpkg_package_files "
             "WHERE package=? AND version=? AND repo=?", row[1:])
         cur.execute("DELETE FROM dpkg_packages WHERE filename=?", (row[0],))
+        cur.execute("DELETE FROM dpkg_package_duplicate WHERE filename=?", (row[0],))
     #check_list = [[] for _ in range(4)]
     check_list = []
     for fullpath in search_path.rglob('*.deb'):
@@ -182,6 +183,10 @@ def scan_dir(db: sqlite3.Connection, base_dir: str, branch: str, component: str)
                             "WHERE package=? AND version=? AND repo=?", dbkey)
                         cur.execute("DELETE FROM dpkg_package_files "
                             "WHERE package=? AND version=? AND repo=?", dbkey)
+                        cur.execute("DELETE FROM dpkg_package_duplicate "
+                            "WHERE package=? AND version=? AND repo=?", dbkey)
+                        cur.execute("INSERT INTO dpkg_package_duplicate "
+                            "SELECT * FROM dpkg_packages WHERE filename=?", oldver[1])
                         cur.execute("DELETE FROM dpkg_packages "
                             "WHERE package=? AND version=? AND repo=?", dbkey)
                         logger_scan.error('DUP    %s == %s',

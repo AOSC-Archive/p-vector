@@ -6,11 +6,11 @@ SELECT
   sp2.package package_lib, sp2.ver ver_provide
 FROM dpkg_package_sodep sd
 LEFT JOIN dpkg_package_sodep sp
-ON sd.repo=sp.repo AND sp.deptype=1 AND sd.name=sp.name
+ON sd.repo=sp.repo AND sp.depends=0 AND sd.name=sp.name
 AND (sd.ver=sp.ver OR sd.ver LIKE sp.ver || '.%')
 LEFT JOIN dpkg_package_sodep sp2
-ON sd.repo=sp2.repo AND sp2.deptype=1 AND sd.name=sp2.name
-WHERE sd.deptype=1 AND sp.package IS NULL
+ON sd.repo=sp2.repo AND sp2.depends=0 AND sd.name=sp2.name
+WHERE sd.depends=1 AND sp.package IS NULL
 """
 
 aggregate_args = [

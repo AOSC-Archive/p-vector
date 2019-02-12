@@ -30,6 +30,19 @@ def init_db(db: sqlite3.Connection):
                 'control TEXT,'
                 'PRIMARY KEY (package, version, repo)'
                 ')')
+    cur.execute('CREATE TABLE IF NOT EXISTS dpkg_package_duplicate ('
+                'package TEXT,'
+                'version TEXT,'
+                'repo TEXT,'
+                'architecture TEXT,'
+                'filename TEXT,'
+                'size INTEGER,'
+                'sha256 TEXT,'
+                'mtime INTEGER,'
+                'debtime INTEGER,'
+                'control TEXT,'
+                'PRIMARY KEY (filename)'
+                ')')
     cur.execute('CREATE TABLE IF NOT EXISTS dpkg_package_sodep ('
                 'package TEXT,'
                 'version TEXT,'
@@ -56,6 +69,8 @@ def init_db(db: sqlite3.Connection):
                 ')')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_dpkg_packages_filename'
                 ' ON dpkg_packages (filename)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_dpkg_package_duplicate_package'
+                ' ON dpkg_package_duplicate (package, version, repo)')
     db.commit()
     cur.close()
 
