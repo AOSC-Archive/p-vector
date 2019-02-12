@@ -201,5 +201,9 @@ def scan(db: sqlite3.Connection, base_dir: str):
             if not j.is_dir():
                 continue
             component_name = j.name
-            scan_dir(db, base_dir, branch_name, component_name)
+            try:
+                scan_dir(db, base_dir, branch_name, component_name)
+            finally:
+                db.commit()
             logger_scan.info('==== %s-%s ====', branch_name, component_name)
+    db.execute('PRAGMA optimize')
