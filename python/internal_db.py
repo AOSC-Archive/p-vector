@@ -92,7 +92,7 @@ def init_index(db: sqlite3.Connection):
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_sodep_package'
                 ' ON pv_package_sodep (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_sodep_name'
-                ' ON pv_package_sodep (name)')
+                ' ON pv_package_sodep (name) WHERE depends=0')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_files_package'
                 ' ON pv_package_files (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_files_path_name'
