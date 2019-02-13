@@ -91,7 +91,7 @@ def gen_contents(db: sqlite3.Connection,
             SELECT df.path || '/' || df.name AS f, group_concat(DISTINCT (
               json_extract(dp.control, '$.Section') || '/' || dp.package)) AS p
             FROM pv_packages dp
-            INNER JOIN pv_package_files df USING (package, version, repopath)
+            INNER JOIN pv_package_files df USING (package, version, repo)
             INNER JOIN pv_repos pr ON pr.name=dp.repo
             WHERE pr.path=? AND df.ftype='reg' AND pr.architecture IN (?, 'all')
             GROUP BY df.path, df.name""", (repopath, arch))

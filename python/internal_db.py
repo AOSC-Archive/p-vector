@@ -77,6 +77,8 @@ def init_db(db: sqlite3.Connection):
                 ')')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_path'
                 ' ON pv_repos (path, architecture)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_packages_repo'
+                ' ON pv_packages (repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_duplicate_package'
                 ' ON pv_package_duplicate (package, version, repo)')
     db.commit()
