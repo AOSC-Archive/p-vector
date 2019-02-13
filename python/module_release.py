@@ -138,7 +138,8 @@ def gen_release(db: sqlite3.Connection, branch_name: str,
 
     r = r_template.copy()
 
-    r['Architectures'] = ' '.join(sorted(set.union(*meta_data_list.values())))
+    r['Architectures'] = ' '.join(sorted(
+        set.union(*map(set, meta_data_list.values()))))
     r['Components'] = ' '.join(sorted(component_name_list))
     hash_list = []
     for c in meta_data_list:
