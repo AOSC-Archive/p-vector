@@ -28,6 +28,8 @@ FILETYPES = {
     0o010000: 'fifo',
 }
 
+BRANCHES = ('stable', 'testing', 'explosive')
+
 def split_soname(s: str):
     spl = s.rsplit('.so', 1)
     if len(spl) == 1:
@@ -153,8 +155,9 @@ def scan_dir(db: sqlite3.Connection, base_dir: str, branch: str, component: str)
             if component != 'main':
                 realname = component + '-' + realname
             repo = '%s/%s' % (realname, branch)
-            cur.execute("INSERT OR IGNORE INTO pv_repos VALUES (?,?,?,?,?,?)",
-                (repo, realname, comppath, branch, component, pkginfo['architecture']))
+            cur.execute("INSERT OR IGNORE INTO pv_repos VALUES (?,?,?,?,?,?,?)",
+                (repo, realname, comppath, BRANCHES.index(branch),
+                branch, component, pkginfo['architecture']))
             pkginfo['repo'] = repo
             dbkey = (pkginfo['package'], pkginfo['version'], repo)
             if pkginfo['filename'] in dup_pkgs:

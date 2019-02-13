@@ -21,6 +21,7 @@ def init_db(db: sqlite3.Connection):
                 'name TEXT PRIMARY KEY,' # key: bsp-sunxi-armel/testing
                 'realname TEXT,'     # group key: amd64, bsp-sunxi-armel
                 'path TEXT,'         # testing/main
+                'testing INTEGER,'   # 0, 1, 2
                 'branch TEXT,'       # stable, testing, explosive
                 'component TEXT,'    # main, bsp-sunxi, opt-avx2
                 'architecture TEXT'  # amd64, all
