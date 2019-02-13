@@ -84,8 +84,6 @@ def gen_contents(db: sqlite3.Connection,
     cur = db.cursor()
     allarch = [r[0] for r in cur.execute("SELECT architecture FROM pv_repos "
         "WHERE architecture != 'all' AND path=?", (repopath,))]
-    d = basedir.joinpath('Contents-all')
-    d.mkdir(0o755, parents=True, exist_ok=True)
     for arch in allarch:
         cur.execute("""
             SELECT df.path || '/' || df.name AS f, group_concat(DISTINCT (coalesce(
