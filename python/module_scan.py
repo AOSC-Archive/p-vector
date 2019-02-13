@@ -65,7 +65,7 @@ def scan_deb(args):
         'architecture': p.control['Architecture'],
         'filename': filename,
         'size': size,
-        'sha256': binascii.b2a_hex(bytes(p.p['hash_value'])).encode('ascii'),
+        'sha256': binascii.b2a_hex(bytes(p.p['hash_value'])).decode('ascii'),
         'mtime': mtime,
         'debtime': p.p['time'],
         'control': json.dumps(collections.OrderedDict(p.control),
