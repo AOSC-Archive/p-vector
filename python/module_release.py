@@ -57,7 +57,7 @@ def gen_packages(db: sqlite3.Connection, dist_dir: str,
     cur.execute("SELECT p.package, p.architecture, p.filename, "
         "p.size, p.sha256, p.control "
         "FROM pv_packages p INNER JOIN pv_repos r ON p.repo=r.name "
-        "WHERE r.path=?", (repopath,))
+        "WHERE r.path=? AND p.control IS NOT NULL", (repopath,))
     for package, architecture, filename, size, sha256, control_json in cur:
         if architecture not in arch_packages:
             d = basedir.joinpath('binary-' + architecture)
@@ -88,12 +88,13 @@ def gen_contents(db: sqlite3.Connection,
     d.mkdir(0o755, parents=True, exist_ok=True)
     for arch in allarch:
         cur.execute("""
-            SELECT df.path || '/' || df.name AS f, group_concat(DISTINCT (
-              json_extract(dp.control, '$.Section') || '/' || dp.package)) AS p
+            SELECT df.path || '/' || df.name AS f, group_concat(DISTINCT (coalesce(
+              json_extract(dp.control, '$.Section') || '/', '') || dp.package)) AS p
             FROM pv_packages dp
             INNER JOIN pv_package_files df USING (package, version, repo)
             INNER JOIN pv_repos pr ON pr.name=dp.repo
             WHERE pr.path=? AND df.ftype='reg' AND pr.architecture IN (?, 'all')
+            AND dp.control IS NOT NULL
             GROUP BY df.path, df.name""", (repopath, arch))
         filename = str(basedir.joinpath('Contents-%s.gz' % arch))
         with gzip.open(filename, 'wb', 9) as f:
