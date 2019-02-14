@@ -73,7 +73,7 @@ void ElfDependency::scan() {
     // Get Ehdr
     _Ehdr ehdr{};
     must_read((char *) &ehdr + EI_NIDENT, sizeof(ehdr) - EI_NIDENT);
-    is_dyn = ehdr.e_type == ET_DYN;
+    is_dyn = H(ehdr.e_type) == ET_DYN;
 
     // Get Shdr
     must_seek(H(ehdr.e_shoff));
