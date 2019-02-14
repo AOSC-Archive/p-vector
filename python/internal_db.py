@@ -78,8 +78,8 @@ def init_db(db: sqlite3.Connection):
                 ')')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_path'
                 ' ON pv_repos (path, architecture)')
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_realname'
-                ' ON pv_repos (realname, testing)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_architecture'
+                ' ON pv_repos (architecture, testing)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_packages_repo'
                 ' ON pv_packages (repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_duplicate_package'
@@ -92,7 +92,7 @@ def init_index(db: sqlite3.Connection):
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_sodep_package'
                 ' ON pv_package_sodep (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_sodep_name'
-                ' ON pv_package_sodep (name) WHERE depends=0')
+                ' ON pv_package_sodep (name, repo) WHERE depends=0')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_files_package'
                 ' ON pv_package_files (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_files_path_name'
