@@ -68,7 +68,7 @@ def scan_deb(args):
         'sha256': binascii.b2a_hex(bytes(p.p['hash_value'])).decode('ascii'),
         'mtime': mtime,
         'debtime': p.p['time'],
-        'section': p.control['Section'],
+        'section': p.control.get('Section'),
         'installed_size': p.control['Installed-Size'],
         'maintainer': p.control['Maintainer'],
         'description': p.control['Description'],
