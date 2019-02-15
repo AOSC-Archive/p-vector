@@ -4,7 +4,6 @@ install(FILES
         internal_db.py
         internal_dpkg_version.py
         internal_pkgscan.py
-        internal_print.py
         module_ipc.py
         module_release.py
         module_scan.py
