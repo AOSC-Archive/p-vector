@@ -1,22 +1,18 @@
-import sqlite3
 
 def make_insert(d):
     keys, values = zip(*d.items())
-    return ', '.join(keys), ', '.join('?' * len(values)), values
+    return ', '.join(keys), ', '.join('%s' * len(values)), values
 
 def make_update(d):
     keys, values = zip(*d.items())
-    return ', '.join(k + '=?' for k in keys), values
+    return ', '.join(k + '=%s' for k in keys), values
 
 def make_where(d):
     keys, values = zip(*d.items())
-    return ' AND '.join(k + '=?' for k in keys), values
+    return ' AND '.join(k + '=%s' for k in keys), values
 
-def init_db(db: sqlite3.Connection):
+def init_db(db, dbtype='sqlite'):
     cur = db.cursor()
-    cur.execute('PRAGMA journal_mode=WAL')
-    cur.execute('PRAGMA application_id=1886807395')
-    cur.execute('PRAGMA case_sensitive_like=1')
     cur.execute('CREATE TABLE IF NOT EXISTS pv_repos ('
                 'name TEXT PRIMARY KEY,' # key: bsp-sunxi-armel/testing
                 'realname TEXT,'     # group key: amd64, bsp-sunxi-armel
@@ -36,7 +32,11 @@ def init_db(db: sqlite3.Connection):
                 'sha256 TEXT,'
                 'mtime INTEGER,'
                 'debtime INTEGER,'
-                'control TEXT,'
+                'section TEXT,'
+                'installed_size INTEGER,'  # x1024
+                'maintainer TEXT,'
+                'description TEXT,'
+                '_vercomp TEXT,'
                 'PRIMARY KEY (package, version, repo)'
                 ')')
     cur.execute('CREATE TABLE IF NOT EXISTS pv_package_duplicate ('
@@ -49,8 +49,25 @@ def init_db(db: sqlite3.Connection):
                 'sha256 TEXT,'
                 'mtime INTEGER,'
                 'debtime INTEGER,'
-                'control TEXT,'
+                'section TEXT,'
+                'installed_size INTEGER,'  # x1024
+                'maintainer TEXT,'
+                'description TEXT,'
+                '_vercomp TEXT,'
                 'PRIMARY KEY (filename)'
+                ')')
+    cur.execute('CREATE TABLE IF NOT EXISTS pv_package_dependencies ('
+                'package TEXT,'
+                'version TEXT,'
+                'repo TEXT,'
+                'depends TEXT,'
+                'pre_depends TEXT,'
+                'recommends TEXT,'
+                'suggests TEXT,'
+                'enhances TEXT,'
+                'breaks TEXT,'
+                'conflicts TEXT,'
+                'PRIMARY KEY (package, version, repo)'
                 ')')
     cur.execute('CREATE TABLE IF NOT EXISTS pv_package_sodep ('
                 'package TEXT,'
@@ -87,8 +104,10 @@ def init_db(db: sqlite3.Connection):
     db.commit()
     cur.close()
 
-def init_index(db: sqlite3.Connection):
+def init_index(db):
     cur = db.cursor()
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_packages_vercomp'
+                ' ON pv_packages (repo, package, _vercomp)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_sodep_package'
                 ' ON pv_package_sodep (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_sodep_name'

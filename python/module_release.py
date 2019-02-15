@@ -1,20 +1,17 @@
 import os
-import json
 import gzip
 import shutil
-import sqlite3
 import logging
 import datetime
 import subprocess
 from pathlib import PosixPath, PurePath
 
 import deb822
-from internal_pkgscan import sha256_file
+from internal_pkgscan import sha256_file, DEP_KEYS
 
 logger_rel = logging.getLogger('REL')
 
-def generate(db: sqlite3.Connection, base_dir: str,
-             conf_common: dict, conf_branches: dict):
+def generate(db, base_dir: str, conf_common: dict, conf_branches: dict):
     dist_dir = base_dir + '/dists.new'
     pool_dir = base_dir + '/pool'
     for i in PosixPath(pool_dir).iterdir():
@@ -44,8 +41,7 @@ def generate(db: sqlite3.Connection, base_dir: str,
     shutil.rmtree(dist_dir_old, True)
 
 
-def gen_packages(db: sqlite3.Connection, dist_dir: str,
-                 branch_name: str, component_name: str):
+def gen_packages(db, dist_dir: str, branch_name: str, component_name: str):
     repopath = branch_name + '/' + component_name
     basedir = PosixPath(dist_dir).joinpath(branch_name).joinpath(component_name)
     d = basedir.joinpath('binary-all')
@@ -54,21 +50,38 @@ def gen_packages(db: sqlite3.Connection, dist_dir: str,
         str(d.joinpath('Packages')), 'w', encoding='utf-8')}
 
     cur = db.cursor()
-    cur.execute("SELECT p.package, p.architecture, p.filename, "
-        "p.size, p.sha256, p.control "
-        "FROM pv_packages p INNER JOIN pv_repos r ON p.repo=r.name "
-        "WHERE r.path=? AND p.control IS NOT NULL", (repopath,))
-    for package, architecture, filename, size, sha256, control_json in cur:
+    cur.execute("""
+        SELECT p.package, p.version, p.architecture, p.filename, p.size,
+          p.sha256, p.section, p.installed_size, p.maintainer, p.description,
+          pd.depends, pd.pre_depends, pd.recommends, pd.suggests, pd.enhances,
+          pd.breaks, pd.conflicts
+        FROM pv_packages p INNER JOIN pv_repos r ON p.repo=r.name
+        LEFT JOIN pv_package_dependencies pd ON pd.package=p.package
+        AND pd.version=p.version AND pd.repo=p.repo
+        WHERE r.path=%s AND p.debtime IS NOT NULL""", (repopath,))
+    for row in cur:
+        architecture = row['architecture']
         if architecture not in arch_packages:
             d = basedir.joinpath('binary-' + architecture)
             d.mkdir(0o755, parents=True, exist_ok=True)
             arch_packages[architecture] = open(
                 str(d.joinpath('Packages')), 'w', encoding='utf-8')
         f = arch_packages[architecture]
-        control = json.loads(control_json)
-        control['Filename'] = filename
-        control['Size'] = str(size)
-        control['SHA256'] = sha256
+        control = {
+            'Package': row['package'],
+            'Version': row['version'],
+            'Section': row['section'],
+            'Architecture': architecture,
+            'Installed-Size': row['installed_size'],
+            'Maintainer': row['maintainer'],
+            'Filename': row['filename'],
+            'Size': str(row['size']),
+            'SHA256': row['sha256'],
+            'Description': row['description']
+        }
+        for dbkey, key in DEP_KEYS:
+            if row[dbkey]:
+                control[key] = row[dbkey]
         print(deb822.SortPackages(deb822.Packages(control)), file=f)
     for f in arch_packages.values():
         file_path = f.name
@@ -76,23 +89,22 @@ def gen_packages(db: sqlite3.Connection, dist_dir: str,
         subprocess.check_call(('xz', '-k', '-0', '-f', file_path))
 
 
-def gen_contents(db: sqlite3.Connection,
-                 branch_name: str, component_name: str, dist_dir: str):
+def gen_contents(db, branch_name: str, component_name: str, dist_dir: str):
     repopath = branch_name + '/' + component_name
     basedir = PosixPath(dist_dir).joinpath(branch_name).joinpath(component_name)
     basedir.mkdir(0o755, parents=True, exist_ok=True)
     cur = db.cursor()
     allarch = [r[0] for r in cur.execute("SELECT architecture FROM pv_repos "
-        "WHERE architecture != 'all' AND path=?", (repopath,))]
+        "WHERE architecture != 'all' AND path=%s", (repopath,))]
     for arch in allarch:
         cur.execute("""
-            SELECT df.path || '/' || df.name AS f, group_concat(DISTINCT (coalesce(
-              json_extract(dp.control, '$.Section') || '/', '') || dp.package)) AS p
+            SELECT df.path || '/' || df.name AS f, group_concat(DISTINCT (
+              coalesce(dp.section || '/', '') || dp.package)) AS p
             FROM pv_packages dp
             INNER JOIN pv_package_files df USING (package, version, repo)
             INNER JOIN pv_repos pr ON pr.name=dp.repo
-            WHERE pr.path=? AND df.ftype='reg' AND pr.architecture IN (?, 'all')
-            AND dp.control IS NOT NULL
+            WHERE pr.path=%s AND df.ftype='reg'
+            AND pr.architecture IN (%s, 'all') AND dp.debtime IS NOT NULL
             GROUP BY df.path, df.name""", (repopath, arch))
         filename = str(basedir.joinpath('Contents-%s.gz' % arch))
         with gzip.open(filename, 'wb', 9) as f:
@@ -102,7 +114,7 @@ def gen_contents(db: sqlite3.Connection,
 
 GPG_MAIN = os.environ.get('GPG', shutil.which('gpg2')) or shutil.which('gpg')
 
-def gen_release(db: sqlite3.Connection, branch_name: str,
+def gen_release(db, branch_name: str,
                 component_name_list: list, dist_dir: str, conf: dict):
     branch_dir = PosixPath(dist_dir).joinpath(branch_name)
     if not branch_dir.exists():
@@ -111,7 +123,7 @@ def gen_release(db: sqlite3.Connection, branch_name: str,
     cur = db.cursor()
     meta_data_list = dict.fromkeys(component_name_list)
     for component_name in component_name_list:
-        cur.execute("SELECT architecture FROM pv_repos WHERE path=?",
+        cur.execute("SELECT architecture FROM pv_repos WHERE path=%s",
             (branch_name + '/' + component_name,))
         meta_data_list[component_name] = [r[0] for r in cur] or ['all']
     cur.close()

@@ -27,19 +27,16 @@ def _comparable_digit(i: str):
     length = len(clean_number)
     if not (1 <= length <= 26):
         raise AssertionError('malformed number string')
-    return chr(ord('a') + (length - 1)) + clean_number
+    return chr(ord('0') + (length - 1)) + clean_number
 
 
 def _comparable_non_digit(s: str):
     # Add '|' to indicate the end of string
     s = (s + '|').encode('ASCII')
+    table = '~|ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy+-.'
 
     def m(n):
-        if n == ord('|'):
-            return ord('%')  # Let the end of string be 1
-        if n == ord('~'):
-            return ord('#')  # '~' should be even less than the end of string
-        return n
+        return ord('0') + table.index(chr(n))
 
     return bytes(map(m, s)).decode('ASCII')
 

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 import os
 import sys
-import sqlite3
 import logging
 
 import yaml
+import psycopg2
+import psycopg2.extras
 
 sys.path.insert(0, os.path.normpath(os.path.dirname(__file__) + '/../libexec/p-vector'))
 import module_ipc
@@ -17,37 +18,6 @@ logging.basicConfig(
 
 conf_common = None
 conf_branches = {}
-
-def check_file_dup(db: sqlite3.Connection):
-    cur = file_col.aggregate([
-
-        {'$match': {'is_dir': False}},  # Exclude directories
-
-        {'$group': {  # Count packages that own the same file
-            '_id': '$path',
-            'count': {'$sum': 1},
-            'pkgs': {'$push': {
-                'name': '$pkg.name',
-                'ver': '$pkg.ver'
-            }}
-        }},
-
-        {'$match': {'count': {'$gt': 1}}},  # Pick the files which are contained in >1 packages
-
-        {'$group': {  # Pick the first file as sample for each package set
-            '_id': '$pkgs',
-            'count': {'$sum': 1},
-            'sample': {'$first': '$_id'}
-        }},
-
-    ], allowDiskUse=True)
-    for i in cur:
-        print(*[p['name'] + '@' + p['ver'] for p in i['_id']], end=': ')
-        print(i['sample'], end='')
-        if i['count'] == 1:
-            print()
-        else:
-            print(' and', i['count'], 'more')
 
 
 def main():
@@ -67,7 +37,8 @@ def main():
                 continue
             conf_branches[i['branch']] = i
 
-    db = sqlite3.connect(conf_common['db_sqlite'])
+    db = psycopg2.connect(conf_common['db_pgconn'],
+                          cursor_factory=psycopg2.extras.DictCursor)
     base_dir = conf_common['path']
 
     if action == 'scan':

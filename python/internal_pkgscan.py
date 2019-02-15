@@ -5,6 +5,15 @@ import subprocess
 
 import deb822
 
+DEP_KEYS = (
+    ('depends', 'Depends'),
+    ('pre_depends', 'Pre-Depends'),
+    ('recommends', 'Recommends'),
+    ('suggests', 'Suggests'),
+    ('enhances', 'Enhances'),
+    ('breaks', 'Breaks'),
+    ('conflicts', 'Conflicts')
+)
 
 class PkgInfoWrapper(object):
     control = None
