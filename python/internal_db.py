@@ -84,7 +84,7 @@ def init_db(db, dbtype='sqlite'):
                 'repo TEXT,'
                 'path TEXT,'
                 'name TEXT,'
-                'size INTEGER,'
+                'size BIGINT,'
                 'ftype TEXT,'
                 'perm INTEGER,'
                 'uid INTEGER,'
