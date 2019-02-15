@@ -28,12 +28,12 @@ def init_db(db, dbtype='sqlite'):
                 'repo TEXT,'
                 'architecture TEXT,'
                 'filename TEXT,'
-                'size INTEGER,'
+                'size BIGINT,'
                 'sha256 TEXT,'
                 'mtime INTEGER,'
                 'debtime INTEGER,'
                 'section TEXT,'
-                'installed_size INTEGER,'  # x1024
+                'installed_size BIGINT,'  # x1024
                 'maintainer TEXT,'
                 'description TEXT,'
                 '_vercomp TEXT,'
@@ -45,12 +45,12 @@ def init_db(db, dbtype='sqlite'):
                 'repo TEXT,'
                 'architecture TEXT,'
                 'filename TEXT,'
-                'size INTEGER,'
+                'size BIGINT,'
                 'sha256 TEXT,'
                 'mtime INTEGER,'
                 'debtime INTEGER,'
                 'section TEXT,'
-                'installed_size INTEGER,'  # x1024
+                'installed_size BIGINT,'  # x1024
                 'maintainer TEXT,'
                 'description TEXT,'
                 '_vercomp TEXT,'
