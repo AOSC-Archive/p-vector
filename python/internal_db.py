@@ -1,7 +1,7 @@
 
 def make_insert(d):
     keys, values = zip(*d.items())
-    return ', '.join(keys), ', '.join('%s' * len(values)), values
+    return ', '.join(keys), ', '.join(('%s',) * len(values)), values
 
 def make_update(d):
     keys, values = zip(*d.items())
