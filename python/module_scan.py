@@ -153,7 +153,7 @@ def scan_dir(db, base_dir: str, branch: str, component: str):
         check_list.append((sfullpath, str(fullpath.relative_to(base_dir)),
                            stat.st_size, int(stat.st_mtime)))
     del ignore_files
-    with multiprocessing.dummy.Pool(os.cpu_count() + 1) as mpool:
+    with multiprocessing.dummy.Pool(max(1, os.cpu_count() - 1)) as mpool:
         for pkginfo, depinfo, sodeps, files in mpool.imap_unordered(
             scan_deb, check_list, 5):
             realname = pkginfo['architecture']
