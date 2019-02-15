@@ -33,7 +33,7 @@ def _comparable_digit(i: str):
 def _comparable_non_digit(s: str):
     # Add '|' to indicate the end of string
     s = (s + '|').encode('ASCII')
-    table = '~|ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy+-.'
+    table = '~|ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+-.'
 
     def m(n):
         return ord('0') + table.index(chr(n))
