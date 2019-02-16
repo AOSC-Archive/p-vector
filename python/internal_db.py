@@ -96,6 +96,11 @@ def init_db(db, dbtype='sqlite'):
                 'gname TEXT'
                 # 'PRIMARY KEY (package, version, repo, path, name)'
                 ')')
+    cur.execute('CREATE VIEW IF NOT EXISTS v_packages_new AS '
+                'SELECT DISTINCT ON (repo, package) package, version, repo, '
+                '  architecture, filename, size, sha256, mtime, debtime, '
+                '  section, installed_size, maintainer, description '
+                'ORDER BY repo, package, _vercomp DESC')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_path'
                 ' ON pv_repos (path, architecture)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_architecture'
@@ -118,7 +123,7 @@ def init_db(db, dbtype='sqlite'):
 def init_index(db):
     cur = db.cursor()
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_packages_vercomp'
-                ' ON pv_packages (repo, package, _vercomp)')
+                ' ON pv_packages (repo, package, _vercomp DESC)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_sodep_package'
                 ' ON pv_package_sodep (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_sodep_name'
