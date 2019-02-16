@@ -96,7 +96,7 @@ def init_db(db, dbtype='sqlite'):
                 'gname TEXT'
                 # 'PRIMARY KEY (package, version, repo, path, name)'
                 ')')
-    cur.execute('CREATE OR REPLACE VIEW v_packages_new AS '
+    cur.execute('CREATE MATERIALIZED VIEW IF NOT EXISTS v_packages_new AS '
                 'SELECT DISTINCT ON (repo, package) package, version, repo, '
                 '  architecture, filename, size, sha256, mtime, debtime, '
                 '  section, installed_size, maintainer, description '
@@ -133,5 +133,6 @@ def init_index(db):
                 ' ON pv_package_files (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_files_path_name'
                 ' ON pv_package_files (path, name)')
+    cur.execute('REFRESH MATERIALIZED VIEW v_packages_new')
     db.commit()
     cur.close()
