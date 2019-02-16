@@ -10,9 +10,9 @@ Multi repository, finding potential file collisions, checking shared object comp
 - Python 3
 - OpenSSL (libcrypto)
 - LibArchive
-- (Python 3) pymongo
+- (Python 3) psycopg2
 
-And you need a MongoDB server. You may deploy one on your local machine.
+And you need a PostgreSQL server. You may deploy one on your local machine.
 
 Compile-time:
 - CMake
