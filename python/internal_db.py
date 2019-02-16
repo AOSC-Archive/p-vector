@@ -1,4 +1,7 @@
 
+import os
+import psycopg2
+
 def make_insert(d):
     keys, values = zip(*d.items())
     return ', '.join(keys), ', '.join(('%s',) * len(values)), values
@@ -102,6 +105,13 @@ def init_db(db, dbtype='sqlite'):
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_duplicate_package'
                 ' ON pv_package_duplicate (package, version, repo)')
     db.commit()
+    try:
+        cur.execute("SELECT 'comparable_dpkgver'::regproc")
+    except psycopg2.ProgrammingError:
+        sqlfile = os.path.join(os.path.dirname(__file__), 'vercomp.sql')
+        with open(sqlfile, 'r', encoding='utf-8'):
+            cur.execute(f.read())
+            db.commit()
     cur.close()
 
 def init_index(db):
