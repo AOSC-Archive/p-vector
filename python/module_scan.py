@@ -240,7 +240,7 @@ def scan(db, base_dir: str):
         if not i.is_dir():
             continue
         branch_name = i.name
-        print('====', branch_name, '====')
+        logger_scan.info('Branch: %s', branch_name)
         for j in PosixPath(pool_dir).joinpath(branch_name).iterdir():
             if not j.is_dir():
                 continue
