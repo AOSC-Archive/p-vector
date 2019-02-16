@@ -178,6 +178,6 @@ def gen_release(db, branch_name: str,
         f.write(str(r))
     subprocess.check_call([
         GPG_MAIN, '--batch', '--yes', '--clearsign',
-        '-o', str(path.joinpath('InRelease')), str(release_fn)
+        '-o', str(branch_dir.joinpath('InRelease')), str(release_fn)
     ])
     release_fn.unlink()
