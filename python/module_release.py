@@ -70,7 +70,6 @@ def gen_packages(db, dist_dir: str, branch_name: str, component_name: str):
         control = {
             'Package': row['package'],
             'Version': row['version'],
-            'Section': row['section'],
             'Architecture': architecture,
             'Installed-Size': str(row['installed_size']),
             'Maintainer': row['maintainer'],
@@ -79,6 +78,8 @@ def gen_packages(db, dist_dir: str, branch_name: str, component_name: str):
             'SHA256': row['sha256'],
             'Description': row['description']
         }
+        if row['section']:
+            control['Section'] = row['section']
         for dbkey, key in DEP_KEYS:
             if row[dbkey]:
                 control[key] = row[dbkey]
