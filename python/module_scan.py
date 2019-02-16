@@ -3,7 +3,6 @@ from pathlib import PosixPath
 
 import logging
 import binascii
-import itertools
 import functools
 import urllib.parse
 import multiprocessing.dummy
@@ -124,12 +123,13 @@ def scan_dir(db, base_dir: str, branch: str, component: str):
                 ignore_files.add(str(fullpath))
             else:
                 dup_pkgs.add(filename)
+                del_list.append((filename, package, version, repopath))
         else:
             del_list.append((filename, package, version, repopath))
             logger_scan.info('CLEAN  %s', filename)
             module_ipc.publish_change(
                 compname, package, architecture, 'delete', version, '')
-    for row in itertools.chain(del_list, dup_pkgs):
+    for row in del_list:
         cur.execute("DELETE FROM pv_package_sodep "
             "WHERE package=%s AND version=%s AND repo=%s", row[1:])
         cur.execute("DELETE FROM pv_package_files "
