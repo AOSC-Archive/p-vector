@@ -72,7 +72,7 @@ def gen_packages(db, dist_dir: str, branch_name: str, component_name: str):
             'Version': row['version'],
             'Section': row['section'],
             'Architecture': architecture,
-            'Installed-Size': row['installed_size'],
+            'Installed-Size': str(row['installed_size']),
             'Maintainer': row['maintainer'],
             'Filename': row['filename'],
             'Size': str(row['size']),
