@@ -108,6 +108,7 @@ def init_db(db, dbtype='sqlite'):
     try:
         cur.execute("SELECT 'comparable_dpkgver'::regproc")
     except psycopg2.ProgrammingError:
+        db.rollback()
         sqlfile = os.path.join(os.path.dirname(__file__), 'vercomp.sql')
         with open(sqlfile, 'r', encoding='utf-8') as f:
             cur.execute(f.read())
