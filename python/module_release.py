@@ -100,8 +100,8 @@ def gen_contents(db, branch_name: str, component_name: str, dist_dir: str):
     allarch = [r[0] for r in cur]
     for arch in allarch:
         cur.execute("""
-            SELECT df.path || '/' || df.name AS f, group_concat(DISTINCT (
-              coalesce(dp.section || '/', '') || dp.package)) AS p
+            SELECT df.path || '/' || df.name AS f, string_agg(DISTINCT (
+              coalesce(dp.section || '/', '') || dp.package), ',') AS p
             FROM pv_packages dp
             INNER JOIN pv_package_files df USING (package, version, repo)
             INNER JOIN pv_repos pr ON pr.name=dp.repo
