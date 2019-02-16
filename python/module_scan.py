@@ -1,338 +1,255 @@
 import os
 from pathlib import PosixPath
 
-import re
-import signal
-import sys
-import threading
+import logging
+import binascii
+import functools
+import urllib.parse
+import multiprocessing.dummy
 from subprocess import CalledProcessError
 
-import bson
-from pymongo.collection import Collection
-from pymongo.cursor import Cursor
-from pymongo.database import Database
-from pymongo.errors import DuplicateKeyError
-
-import internal_dpkg_version
-import internal_pkgscan
 import module_ipc
-from internal_db import get_collections
-from internal_print import *
+import internal_db
+import internal_pkgscan
+import internal_dpkg_version
 
-base_dir = ''
-pool_dir = ''
-interrupted = False
+logger_scan = logging.getLogger('SCAN')
 
+FILETYPES = {
+    0o100000: 'reg',
+    0o120000: 'lnk',
+    0o140000: 'sock',
+    0o020000: 'chr',
+    0o060000: 'blk',
+    0o040000: 'dir',
+    0o010000: 'fifo',
+}
+
+BRANCHES = ('stable', 'testing', 'explosive')
 
 def split_soname(s: str):
-    r = re.compile('\.so(?!=[$.])')
-    pos = r.search(s)
-    if pos is None:
-        return {'name': s, 'ver': ''}
-    return {'name': s[:pos.end()], 'ver': s[pos.end():]}
-
-
-def doc_from_pkg_scan(p):
-    hash_value = bytes(p.p['hash_value'])
-    pkg_doc = {
-        'pkg': {
-            'name': p.control['Package'],
-            'ver': p.control['Version'],
-            'comp_ver': internal_dpkg_version.comparable_ver(p.control['Version']),
-            'arch': p.control['Architecture'],
-        },
-        'deb': {
-            'path': p.filename,
-            'size': bson.int64.Int64(p.p['size']),
-            'hash': hash_value,
-            'mtime': p.mtime
-        },
-        'time': p.p['time'],
-        'control': p.control,
-        'relation': p.control.relations,
-        'so_provides': [split_soname(i) for i in p.p['so_provides']],
-        'so_depends': [split_soname(i) for i in p.p['so_depends']],
-    }
-    file_doc = []
-    for f in p.p['files']:
-        doc = {
-            'deb': hash_value,
-            'pkg': pkg_doc['pkg'],
-            'path': f['path'],
-            'is_dir': f['is_dir'],
-            'size': bson.int64.Int64(f['size']),
-            'type': f['type'],
-            'perm': f['perm'],
-            'uid': f['uid'],
-            'gid': f['gid'],
-            'uname': f['uname'],
-            'gname': f['gname'],
-        }
-        doc['path'] = os.path.normpath(os.path.join('/', doc['path']))
-        doc['base'] = os.path.basename(doc['path'])
-        file_doc.append(doc)
-    return pkg_doc, file_doc
-
-
-def _prune(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection):
-
-    delete_list = []
-    delete_old_list = []
-
-    cur = pkg_col.find()
-    total = cur.count()
-    count = 0
-    for i in cur:
-        if not PosixPath(base_dir).joinpath(i['deb']['path']).exists():
-            delete_list.append((i['deb']['path'], i['pkg']))
-        count += 1
-        progress_bar('Check current', count / total)
-
-    cur = pkg_old_col.find()
-    total = cur.count()
-    count = 0
-    for i in cur:
-        if not PosixPath(base_dir).joinpath(i['deb']['path']).exists():
-            delete_old_list.append(i['deb']['path'])
-        count += 1
-        progress_bar('Check archive', count / total)
-
-    total = len(delete_list)
-    count = 0
-    for i in delete_list:
-        I('CLEAN', 'CUR   ', i[0])
-        pkg_doc = pkg_col.find_one_and_delete({'deb.path': i[0]}, {'pkg': 1})
-        file_col.delete_many({'pkg': i[1]})
-        if pkg_doc is not None:
-            module_ipc.publish_change(
-                pkg_col.name,
-                pkg_doc['pkg']['name'],
-                pkg_doc['pkg']['arch'],
-                'delete',
-                pkg_doc['pkg']['ver'],
-                '',
-            )
-        count += 1
-        progress_bar('Prune current', count / total)
-
-    total = len(delete_old_list)
-    count = 0
-    for i in delete_old_list:
-        I('CLEAN', 'OLD   ', i)
-        pkg_old_col.delete_many({'deb.path': i})
-        count += 1
-        progress_bar('Prune archive', count / total)
-
-    progress_bar_end('Prune database')
-    return
-
-
-def _scan(pkg_col: Collection, pkg_old_col: Collection, file_col: Collection, branch: str, component: str):
-    from concurrent.futures import ThreadPoolExecutor
-    executor = ThreadPoolExecutor(max_workers=os.cpu_count() + 1)
-    futures = []
-    counter_lock = threading.Lock()
-    count = 0
-    total = 0
-
-    def signal_handler(_sig, _frame):
-        global interrupted
-        interrupted = True
-        for future in futures:
-            future.cancel()
-        W('SCAN', 'Received SIGINT. Cancelled pending jobs.', file=sys.stderr)
-
-    signal.signal(signal.SIGINT, signal_handler)
-
-    def scan_deb(rel_path: str, mtime: int, status: str):
-        deb_path = PosixPath(base_dir).joinpath(rel_path)
-        # Scan it.
-        try:
-            p = internal_pkgscan.scan(str(deb_path))
-        except CalledProcessError as e:
-            if e.returncode < 0 and signal.Signals(-e.returncode) == signal.SIGINT:
-                W('SCAN', 'INTR  ', rel_path, file=sys.stderr)
-                return
-            if e.returncode in [1, 2]:
-                E('SCAN', 'ERROR ', rel_path, 'is corrupted, status:', e.returncode)
-                return
-            raise
-        if interrupted:
-            return
-        # Make a new document
-        p.filename = rel_path
-        p.mtime = mtime
-        pkg_doc, file_doc = doc_from_pkg_scan(p)
-
-        '''
-        pkg_doc: meta info of this package
-        file_doc: file list of this package
-        
-        if update in place:
-            pkg_doc (key:deb.path) =replace> [pkg]
-            file_doc (key:deb.hash_value) =replace> [files]
-        else (new deb file):
-            given an index: (name, arch) is unique
-            try to replace an old package or insert in [pkg], put the old one to old_pkg...
-                failed (DuplicateKeyError):
-                    it cannot find the older one and tried to insert itself, but:
-                    if found pkg_doc in pkg:
-                        they have a same version. DUP
-                    else:
-                        this is the oldest one. OLD
-                        insert pkg_doc into [pkg_old]
-                success:
-                    if replaced:
-                        this is the newest one. NEWER
-                        insert file_doc into [files]
-                        insert old_pkg into [pkg_old]
-                    else (inserted):
-                        this is a new package. NEW
-                        insert file_doc into [files]
-                    
-        '''
-
-        if status == 'update':
-            # if a document points to the same path exists, replace it
-            old_pkg = pkg_col.find_one_and_replace(
-                {'deb.path': rel_path}, pkg_doc, {'_id': False}, upsert=False)
-            if old_pkg is None:
-                pkg_old_col.replace_one({'deb.path': rel_path}, pkg_doc)
-            else:
-                file_col.delete_many({'pkg': pkg_doc['pkg']})
-                file_col.insert_many(file_doc)
-            I('SCAN', 'UPDATE', rel_path)
-            module_ipc.publish_change(
-                pkg_col.name,
-                pkg_doc['pkg']['name'],
-                pkg_doc['pkg']['arch'],
-                'overwrite',
-                pkg_doc['pkg']['ver'],
-                pkg_doc['pkg']['ver'],
-            )
-        else:
-            # if this is a new document
-            try:
-                old_pkg = pkg_col.find_one_and_replace(
-                    {'pkg.name': pkg_doc['pkg']['name'],
-                     'pkg.arch': pkg_doc['pkg']['arch'],
-                     'pkg.comp_ver': {'$lt': pkg_doc['pkg']['comp_ver']}
-                     }, pkg_doc, {'_id': False}, upsert=True)
-            except DuplicateKeyError:
-                same_ver_pkg = pkg_col.find_one({'pkg': pkg_doc['pkg']})
-                if same_ver_pkg is None:
-                    # This one is older, we do nothing. We had better delete it.
-                    pkg_old_col.insert_one(pkg_doc)
-                    W('SCAN', 'OLD   ', pkg_doc['pkg']['arch'], pkg_doc['pkg']['name'], pkg_doc['pkg']['ver'])
-                else:
-                    E('SCAN', 'DUP   ', rel_path, '==', same_ver_pkg['deb']['path'])
-                return
-            if old_pkg is not None:
-                # This one is newer, put the old one into archive, insert this one.
-                pkg_old_col.insert_one(old_pkg)
-                file_col.delete_many({'pkg': old_pkg['pkg']})
-                file_col.insert_many(file_doc)
-                I('SCAN', 'NEWER ', pkg_doc['pkg']['arch'], pkg_doc['pkg']['name'],
-                  pkg_doc['pkg']['ver'], '>>', old_pkg['pkg']['ver'])
-                module_ipc.publish_change(
-                    pkg_col.name,
-                    pkg_doc['pkg']['name'],
-                    pkg_doc['pkg']['arch'],
-                    'upgrade',
-                    old_pkg['pkg']['ver'],
-                    pkg_doc['pkg']['ver'],
-                )
-            else:
-                # Completely new package
-                file_col.insert_many(file_doc)
-                I('SCAN', 'NEW   ', pkg_doc['pkg']['arch'], pkg_doc['pkg']['name'], pkg_doc['pkg']['ver'])
-                module_ipc.publish_change(
-                    pkg_col.name,
-                    pkg_doc['pkg']['name'],
-                    pkg_doc['pkg']['arch'],
-                    'new',
-                    '',
-                    pkg_doc['pkg']['ver'],
-                )
-
-    def containment_shell(*args):
-        nonlocal count
-        try:
-            scan_deb(*args)
-        except Exception as e:
-            import logging
-            E('SCAN', e, 'with', args, file=sys.stderr)
-            logging.exception(e)
-            raise
-        finally:
-            with counter_lock:
-                count += 1
-            progress_bar('Scan .deb', count / total)
-
-    deb_files = {}
-    search_path = PosixPath(pool_dir).joinpath(branch).joinpath(component)
-    for i in search_path.rglob('*.deb'):
-        if not i.is_file():
-            continue
-        s = i.stat()
-        deb_files[str(i.relative_to(base_dir))] = {
-            'size': s.st_size,
-            'mtime': int(s.st_mtime),
-            'status': 'new'
-        }
-
-    def filter_deb_files(pkg_in_db: Cursor, files: dict):
-        for cur in pkg_in_db:
-            '''
-            Suppose there are no changes if it has:
-            * the same path (unique);
-            * the same size;
-            * the same modify time.
-            We will not try to calculate hash now because it is too costly.
-            '''
-            path = cur['deb']['path']
-            mtime = cur['deb']['mtime']
-            size = cur['deb']['size']
-            if files[path]['mtime'] != mtime or files[path]['size'] != size:
-                files[path]['status'] = 'update'
-            else:
-                del files[path]
-
-    query_exist = {'deb.path': {'$in': [path for path in deb_files]}}
-    project_exist = {'_id': False, 'deb': True}
-    filter_deb_files(pkg_old_col.find(query_exist, project_exist), deb_files)
-    filter_deb_files(pkg_col.find(query_exist, project_exist), deb_files)
-
-    total = len(deb_files)
-    with executor:
-        for path in deb_files:
-            futures.append(executor.submit(
-                containment_shell, path, deb_files[path]['mtime'], deb_files[path]['status']))
-    if not interrupted:
-        progress_bar_end('Scan .deb')
+    spl = s.rsplit('.so', 1)
+    if len(spl) == 1:
+        return s, ''
     else:
-        print()
+        return spl[0]+'.so', spl[1]
 
+def parse_debname(s: str):
+    basename = urllib.parse.unquote(os.path.splitext(os.path.basename(s))[0])
+    package, other = basename.split('_', 1)
+    version, arch = other.rsplit('_', 1)
+    return package, version, arch
 
-def scan(db: Database, base_dir_: str):
-    global base_dir, pool_dir
-    base_dir = base_dir_
-    pool_dir = base_dir_ + '/pool'
+def scan_deb(args):
+    # fullpath: str, filename: str, size: int, mtime: int
+    # Scan it.
+    fullpath, filename, size, mtime = args
+    try:
+        p = internal_pkgscan.scan(fullpath)
+    except CalledProcessError as e:
+        if e.returncode in (1, 2):
+            logger_scan.error('%s is corrupted, status: %d', fullpath, e.returncode)
+            package, version, arch = parse_debname(filename)
+            pkginfo = {
+                'package': package, 'version': version, 'architecture': arch,
+                'filename': filename, 'size': size, 'mtime': mtime,
+                'sha256': internal_pkgscan.sha256_file(fullpath)
+            }
+            return pkginfo, {}, [], []
+        raise
+    # Make a new document
+    pkginfo = {
+        'package': p.control['Package'],
+        'version': p.control['Version'],
+        '_vercomp': internal_dpkg_version.comparable_ver(p.control['Version']),
+        'architecture': p.control['Architecture'],
+        'filename': filename,
+        'size': size,
+        'sha256': binascii.b2a_hex(bytes(p.p['hash_value'])).decode('ascii'),
+        'mtime': mtime,
+        'debtime': p.p['time'],
+        'section': p.control.get('Section'),
+        'installed_size': p.control['Installed-Size'],
+        'maintainer': p.control['Maintainer'],
+        'description': p.control['Description'],
+    }
+    depinfo = {}
+    for dbkey, key in internal_pkgscan.DEP_KEYS:
+        if key in p.control:
+            depinfo[dbkey] = p.control[key]
+    sodeps = []
+    for row in p.p['so_provides']:
+        sodeps.append((0,) + split_soname(row))
+    for row in p.p['so_depends']:
+        sodeps.append((1,) + split_soname(row))
+    files = []
+    for row in p.p['files']:
+        path, name = os.path.split(os.path.normpath(
+            os.path.join('/', row['path'])))
+        files.append((
+            path.lstrip('/'), name, row['size'],
+            FILETYPES.get(row['type'], str(row['type'])),
+            row['perm'], row['uid'], row['gid'], row['uname'], row['gname']
+        ))
+    return pkginfo, depinfo, sodeps, files
 
+dpkg_vercomp_key = functools.cmp_to_key(
+    internal_dpkg_version.dpkg_version_compare)
+
+def scan_dir(db, base_dir: str, branch: str, component: str):
+    pool_path = PosixPath(base_dir).joinpath('pool')
+    search_path = pool_path.joinpath(branch).joinpath(component)
+    compname = '%s-%s' % (branch, component)
+    comppath = '%s/%s' % (branch, component)
+    cur = db.cursor()
+    cur.execute("""SELECT p.package, p.version, p.repo, p.architecture,
+          p.filename, p.size, p.mtime
+        FROM pv_packages p
+        INNER JOIN pv_repos r ON p.repo=r.name WHERE r.path=%s
+        UNION ALL
+        SELECT p.package, p.version, p.repo, p.architecture,
+          p.filename, p.size, p.mtime
+        FROM pv_package_duplicate p
+        INNER JOIN pv_repos r ON p.repo=r.name WHERE r.path=%s""",
+        (comppath, comppath))
+    dup_pkgs = set()
+    ignore_files = set()
+    del_list = []
+    for package, version, repopath, architecture, filename, size, mtime in cur:
+        fullpath = PosixPath(base_dir).joinpath(filename)
+        if fullpath.is_file():
+            stat = fullpath.stat()
+            if size == stat.st_size and mtime == int(stat.st_mtime):
+                ignore_files.add(str(fullpath))
+            else:
+                dup_pkgs.add(filename)
+                del_list.append((filename, package, version, repopath))
+        else:
+            del_list.append((filename, package, version, repopath))
+            logger_scan.info('CLEAN  %s', filename)
+            module_ipc.publish_change(
+                compname, package, architecture, 'delete', version, '')
+    for row in del_list:
+        cur.execute("DELETE FROM pv_package_sodep "
+            "WHERE package=%s AND version=%s AND repo=%s", row[1:])
+        cur.execute("DELETE FROM pv_package_files "
+            "WHERE package=%s AND version=%s AND repo=%s", row[1:])
+        cur.execute("DELETE FROM pv_package_dependencies "
+            "WHERE package=%s AND version=%s AND repo=%s", row[1:])
+        cur.execute("DELETE FROM pv_packages WHERE filename=%s", (row[0],))
+        cur.execute("DELETE FROM pv_package_duplicate WHERE filename=%s", (row[0],))
+    #check_list = [[] for _ in range(4)]
+    check_list = []
+    for fullpath in search_path.rglob('*.deb'):
+        if not fullpath.is_file():
+            continue
+        stat = fullpath.stat()
+        sfullpath = str(fullpath)
+        if sfullpath in ignore_files:
+            continue
+        #check_list[0].append(sfullpath)
+        #check_list[1].append(str(fullpath.relative_to(base_dir)))
+        #check_list[2].append(stat.st_size)
+        #check_list[3].append(int(stat.st_mtime))
+        check_list.append((sfullpath, str(fullpath.relative_to(base_dir)),
+                           stat.st_size, int(stat.st_mtime)))
+    del ignore_files
+    with multiprocessing.dummy.Pool(max(1, os.cpu_count() - 1)) as mpool:
+        for pkginfo, depinfo, sodeps, files in mpool.imap_unordered(
+            scan_deb, check_list, 5):
+            realname = pkginfo['architecture']
+            if realname == 'all':
+                realname = 'noarch'
+            if component != 'main':
+                realname = component + '-' + realname
+            repo = '%s/%s' % (realname, branch)
+            cur.execute("INSERT INTO pv_repos VALUES (%s,%s,%s,%s,%s,%s,%s) "
+                "ON CONFLICT DO NOTHING",
+                (repo, realname, comppath, BRANCHES.index(branch),
+                branch, component, pkginfo['architecture']))
+            pkginfo['repo'] = repo
+            depinfo['package'] = pkginfo['package']
+            depinfo['version'] = pkginfo['version']
+            depinfo['repo'] = repo
+            dbkey = (pkginfo['package'], pkginfo['version'], repo)
+            if pkginfo['filename'] in dup_pkgs:
+                logger_scan.info('UPDATE %s', pkginfo['filename'])
+                module_ipc.publish_change(
+                    compname, pkginfo['package'], pkginfo['architecture'],
+                    'overwrite', pkginfo['version'], pkginfo['version']
+                )
+            else:
+                cur.execute("SELECT version, filename FROM pv_packages "
+                    "WHERE package=%s AND repo=%s", (pkginfo['package'], repo))
+                results = cur.fetchall()
+                if results:
+                    oldver = max(results, key=lambda x: dpkg_vercomp_key(x[0]))
+                    vercomp = internal_dpkg_version.dpkg_version_compare(
+                        oldver[0], pkginfo['version'])
+                    if vercomp == -1:
+                        logger_scan.info('NEWER  %s %s %s >> %s',
+                            pkginfo['architecture'], pkginfo['package'],
+                            pkginfo['version'], oldver[0])
+                        module_ipc.publish_change(
+                            compname, pkginfo['package'], pkginfo['architecture'],
+                            'upgrade', oldver[0], pkginfo['version']
+                        )
+                    elif vercomp:
+                        logger_scan.warning('OLD    %s %s %s',
+                            pkginfo['architecture'], pkginfo['package'],
+                            pkginfo['version'])
+                    else:
+                        cur.execute("DELETE FROM pv_package_sodep "
+                            "WHERE package=%s AND version=%s AND repo=%s", dbkey)
+                        cur.execute("DELETE FROM pv_package_files "
+                            "WHERE package=%s AND version=%s AND repo=%s", dbkey)
+                        cur.execute("DELETE FROM pv_package_dependencies "
+                            "WHERE package=%s AND version=%s AND repo=%s", dbkey)
+                        cur.execute("DELETE FROM pv_package_duplicate "
+                            "WHERE package=%s AND version=%s AND repo=%s", dbkey)
+                        cur.execute("INSERT INTO pv_package_duplicate "
+                            "SELECT * FROM pv_packages WHERE filename=%s",
+                            (oldver[1],))
+                        cur.execute("DELETE FROM pv_packages "
+                            "WHERE package=%s AND version=%s AND repo=%s", dbkey)
+                        logger_scan.error('DUP    %s == %s',
+                            oldver[1], pkginfo['filename'])
+                else:
+                    logger_scan.info('NEW    %s %s %s', pkginfo['architecture'],
+                        pkginfo['package'], pkginfo['version'])
+                    module_ipc.publish_change(
+                        compname, pkginfo['package'], pkginfo['architecture'],
+                        'new', '', pkginfo['version']
+                    )
+            keys, qms, vals = internal_db.make_insert(pkginfo)
+            cur.execute("INSERT INTO pv_packages (%s) VALUES (%s)" %
+                (keys, qms), vals)
+            keys, qms, vals = internal_db.make_insert(depinfo)
+            cur.execute("INSERT INTO pv_package_dependencies (%s) VALUES (%s)" %
+                (keys, qms), vals)
+            for row in sodeps:
+                cur.execute("INSERT INTO pv_package_sodep VALUES "
+                    "(%s,%s,%s,%s,%s,%s)", dbkey + row)
+            for row in files:
+                cur.execute("INSERT INTO pv_package_files VALUES "
+                    "(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", dbkey + row)
+
+def scan(db, base_dir: str):
+    pool_dir = base_dir + '/pool'
+    internal_db.init_db(db)
     for i in PosixPath(pool_dir).iterdir():
         if not i.is_dir():
             continue
         branch_name = i.name
-        print('====', branch_name, '====')
+        logger_scan.info('Branch: %s', branch_name)
         for j in PosixPath(pool_dir).joinpath(branch_name).iterdir():
             if not j.is_dir():
                 continue
             component_name = j.name
-            pkg_col, pkg_old_col, file_col = get_collections(db, branch_name, component_name)
-            print(branch_name, component_name)
-            _scan(pkg_col, pkg_old_col, file_col, branch_name, component_name)
-            if interrupted:
-                return
-            _prune(pkg_col, pkg_old_col, file_col)
-            if interrupted:
-                return
+            logger_scan.info('==== %s-%s ====', branch_name, component_name)
+            try:
+                scan_dir(db, base_dir, branch_name, component_name)
+            finally:
+                db.commit()
+    internal_db.init_index(db)
+    #db.execute('ANALYZE')

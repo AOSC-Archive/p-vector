@@ -1,52 +1,23 @@
 #!/usr/bin/env python3
 import os
 import sys
+import logging
 
-import pymongo
 import yaml
-from pymongo.collection import Collection
+import psycopg2
+import psycopg2.extras
 
 sys.path.insert(0, os.path.normpath(os.path.dirname(__file__) + '/../libexec/p-vector'))
 import module_ipc
 import module_scan
 import module_release
 
-interrupted = False
+logging.basicConfig(
+    format='%(asctime)s %(levelname).1s [%(name)5.5s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
 
 conf_common = None
 conf_branches = {}
-
-
-def check_file_dup(file_col: Collection):
-    cur = file_col.aggregate([
-
-        {'$match': {'is_dir': False}},  # Exclude directories
-
-        {'$group': {  # Count packages that own the same file
-            '_id': '$path',
-            'count': {'$sum': 1},
-            'pkgs': {'$push': {
-                'name': '$pkg.name',
-                'ver': '$pkg.ver'
-            }}
-        }},
-
-        {'$match': {'count': {'$gt': 1}}},  # Pick the files which are contained in >1 packages
-
-        {'$group': {  # Pick the first file as sample for each package set
-            '_id': '$pkgs',
-            'count': {'$sum': 1},
-            'sample': {'$first': '$_id'}
-        }},
-
-    ], allowDiskUse=True)
-    for i in cur:
-        print(*[p['name'] + '@' + p['ver'] for p in i['_id']], end=': ')
-        print(i['sample'], end='')
-        if i['count'] == 1:
-            print()
-        else:
-            print(' and', i['count'], 'more')
 
 
 def main():
@@ -66,16 +37,8 @@ def main():
                 continue
             conf_branches[i['branch']] = i
 
-    try:
-        client = pymongo.MongoClient(
-            conf_common['db_conn'],
-            appname='p-vector', ssl_ca_certs=conf_common['db_conn_cert'])
-    except KeyError:
-        client = pymongo.MongoClient(
-            conf_common['db_conn'],
-            appname='p-vector')
-
-    db = client['p-vector']
+    db = psycopg2.connect(conf_common['db_pgconn'],
+                          cursor_factory=psycopg2.extras.DictCursor)
     base_dir = conf_common['path']
 
     if action == 'scan':
