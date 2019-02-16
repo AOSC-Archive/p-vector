@@ -94,8 +94,9 @@ def gen_contents(db, branch_name: str, component_name: str, dist_dir: str):
     basedir = PosixPath(dist_dir).joinpath(branch_name).joinpath(component_name)
     basedir.mkdir(0o755, parents=True, exist_ok=True)
     cur = db.cursor()
-    allarch = [r[0] for r in cur.execute("SELECT architecture FROM pv_repos "
-        "WHERE architecture != 'all' AND path=%s", (repopath,))]
+    cur.execute("SELECT architecture FROM pv_repos "
+        "WHERE architecture != 'all' AND path=%s", (repopath,))
+    allarch = [r[0] for r in cur]
     for arch in allarch:
         cur.execute("""
             SELECT df.path || '/' || df.name AS f, group_concat(DISTINCT (
