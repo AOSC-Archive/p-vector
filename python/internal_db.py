@@ -100,6 +100,7 @@ def init_db(db, dbtype='sqlite'):
                 'SELECT DISTINCT ON (repo, package) package, version, repo, '
                 '  architecture, filename, size, sha256, mtime, debtime, '
                 '  section, installed_size, maintainer, description '
+                'FROM pv_packages '
                 'ORDER BY repo, package, _vercomp DESC')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_path'
                 ' ON pv_repos (path, architecture)')
