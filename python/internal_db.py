@@ -96,7 +96,7 @@ def init_db(db, dbtype='sqlite'):
                 'gname TEXT'
                 # 'PRIMARY KEY (package, version, repo, path, name)'
                 ')')
-    cur.execute('CREATE VIEW IF NOT EXISTS v_packages_new AS '
+    cur.execute('CREATE OR REPLACE VIEW v_packages_new AS '
                 'SELECT DISTINCT ON (repo, package) package, version, repo, '
                 '  architecture, filename, size, sha256, mtime, debtime, '
                 '  section, installed_size, maintainer, description '
