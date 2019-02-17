@@ -134,5 +134,7 @@ def init_index(db):
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_files_path_name'
                 ' ON pv_package_files (path, name)')
     cur.execute('REFRESH MATERIALIZED VIEW v_packages_new')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_v_packages_new_package'
+                ' ON v_packages_new (package, version, repo)')
     db.commit()
     cur.close()
