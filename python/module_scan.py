@@ -73,10 +73,8 @@ def scan_deb(args):
         'maintainer': p.control['Maintainer'],
         'description': p.control['Description'],
     }
-    depinfo = {}
-    for dbkey, key in internal_pkgscan.DEP_KEYS:
-        if key in p.control:
-            depinfo[dbkey] = p.control[key]
+    depinfo = {k:p.control[k] for k in ('Depends', 'Pre-Depends', 'Recommends',
+        'Suggests', 'Enhances', 'Breaks', 'Conflicts', 'Provides', 'Replaces')}
     sodeps = []
     for row in p.p['so_provides']:
         sodeps.append((0,) + split_soname(row))
@@ -224,9 +222,9 @@ def scan_dir(db, base_dir: str, branch: str, component: str):
             keys, qms, vals = internal_db.make_insert(pkginfo)
             cur.execute("INSERT INTO pv_packages (%s) VALUES (%s)" %
                 (keys, qms), vals)
-            keys, qms, vals = internal_db.make_insert(depinfo)
-            cur.execute("INSERT INTO pv_package_dependencies (%s) VALUES (%s)" %
-                (keys, qms), vals)
+            for row in depinfo.items():
+                cur.execute("INSERT INTO pv_package_dependencies "
+                    "VALUES (%s,%s,%s,%s,%s)", dbkey + row)
             for row in sodeps:
                 cur.execute("INSERT INTO pv_package_sodep VALUES "
                     "(%s,%s,%s,%s,%s,%s)", dbkey + row)

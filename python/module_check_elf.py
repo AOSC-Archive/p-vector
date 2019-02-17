@@ -2,15 +2,48 @@ from pymongo.collection import Collection
 
 SQL_CHECK_SOVER = """
 SELECT
-  sd.package, sd.version, sd.repo, sd.name, sd.ver,
-  sp2.package package_lib, sp2.ver ver_provide
-FROM dpkg_package_sodep sd
-LEFT JOIN dpkg_package_sodep sp
-ON sd.repo=sp.repo AND sp.depends=0 AND sd.name=sp.name
-AND (sd.ver=sp.ver OR sd.ver LIKE sp.ver || '.%')
-LEFT JOIN dpkg_package_sodep sp2
-ON sd.repo=sp2.repo AND sp2.depends=0 AND sd.name=sp2.name
-WHERE sd.depends=1 AND sp.package IS NULL
+  package, version, repo, name, repo_lib, package_lib, version_lib, ver, ver_provide
+FROM (
+  SELECT
+    sd.package, sd.version, sd.repo, sd.name, rp.name repo_lib,
+    sp.package package_lib, sp.version version_lib, sd.ver, sp.ver ver_provide,
+    count(sp2.package) OVER w matchcnt
+  FROM pv_package_sodep sd
+  INNER JOIN v_packages_new vp USING (package, version, repo)
+  INNER JOIN pv_repos rd ON rd.name=sd.repo
+  INNER JOIN pv_repos rp ON rp.architecture=rd.architecture
+  AND rp.testing<=rd.testing AND rp.component IN (rd.component, 'main')
+  LEFT JOIN pv_package_sodep sp ON sp.repo=rp.name
+  AND sp.depends=0 AND sd.name=sp.name
+  LEFT JOIN v_packages_new vp2
+  ON vp2.package=sp.package AND vp2.version=sp.version AND vp2.repo=sp.repo
+  LEFT JOIN pv_package_sodep sp2
+  ON sp2.repo=sp.repo AND sp2.package=sp.package AND sp2.version=sp.version
+  AND sp.name=sp2.name AND sp.ver=sp2.ver AND sp2.depends=0
+  AND (sp2.ver=sd.ver OR sp2.ver LIKE sd.ver || '.%')
+  WHERE sd.depends=1 AND (sp.package IS NULL OR vp2.package IS NOT NULL)
+  WINDOW w AS (PARTITION BY sd.package, sd.version, sd.repo, sd.name, sd.ver)
+) q1
+WHERE matchcnt=0
+"""
+
+SQL_CHECK_CONFLICT = """
+SELECT
+  f1.package package1, f1.version version1, f1.repo repo1,
+  f2.package package2, f2.version version2, f2.repo repo2,
+  f1.path || '/' || f1.name filename
+FROM pv_package_files f1
+INNER JOIN v_packages_new v1
+ON v1.package=f1.package AND v1.version=f1.version AND v1.repo=f1.repo
+INNER JOIN pv_repos r1 ON r1.name=v1.repo
+INNER JOIN pv_repos r2 ON r2.architecture IN (r1.architecture, 'all')
+AND r2.testing<=r1.testing AND r2.component=r1.component
+INNER JOIN v_packages_new v2
+ON v2.repo=r2.name AND v2.package!=v1.package
+INNER JOIN pv_package_files f2
+ON v2.package=f2.package AND v2.version=f2.version AND v2.repo=f2.repo
+AND f2.path=f1.path AND f2.name=f1.name
+WHERE f1.ftype='reg'
 """
 
 aggregate_args = [

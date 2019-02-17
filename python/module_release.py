@@ -7,7 +7,7 @@ import subprocess
 from pathlib import PosixPath, PurePath
 
 import deb822
-from internal_pkgscan import sha256_file, DEP_KEYS
+from internal_pkgscan import sha256_file
 
 logger_rel = logging.getLogger('REL')
 
@@ -51,14 +51,16 @@ def gen_packages(db, dist_dir: str, branch_name: str, component_name: str):
 
     cur = db.cursor()
     cur.execute("""
-        SELECT p.package, p.version, p.architecture, p.filename, p.size,
-          p.sha256, p.section, p.installed_size, p.maintainer, p.description,
-          pd.depends, pd.pre_depends, pd.recommends, pd.suggests, pd.enhances,
-          pd.breaks, pd.conflicts
+        SELECT p.package, p.version, min(p.architecture) architecture,
+          min(p.filename) filename, min(p.size) size, min(p.sha256) sha256,
+          min(p.section) section, min(p.installed_size) installed_size,
+          min(p.maintainer) maintainer, min(p.description) description,
+          array_agg(array[pd.relationship, pd.value]) dep
         FROM pv_packages p INNER JOIN pv_repos r ON p.repo=r.name
         LEFT JOIN pv_package_dependencies pd ON pd.package=p.package
         AND pd.version=p.version AND pd.repo=p.repo
-        WHERE r.path=%s AND p.debtime IS NOT NULL""", (repopath,))
+        WHERE r.path=%s AND p.debtime IS NOT NULL
+        GROUP BY p.package, p.version, p.repo""", (repopath,))
     for row in cur:
         architecture = row['architecture']
         if architecture not in arch_packages:
@@ -80,9 +82,8 @@ def gen_packages(db, dist_dir: str, branch_name: str, component_name: str):
         }
         if row['section']:
             control['Section'] = row['section']
-        for dbkey, key in DEP_KEYS:
-            if row[dbkey]:
-                control[key] = row[dbkey]
+        for k, v in row['dep']:
+            control[k] = v
         print(deb822.SortPackages(deb822.Packages(control)), file=f)
     for f in arch_packages.values():
         file_path = f.name
