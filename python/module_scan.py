@@ -74,7 +74,8 @@ def scan_deb(args):
         'description': p.control['Description'],
     }
     depinfo = {k:p.control[k] for k in ('Depends', 'Pre-Depends', 'Recommends',
-        'Suggests', 'Enhances', 'Breaks', 'Conflicts', 'Provides', 'Replaces')}
+        'Suggests', 'Enhances', 'Breaks', 'Conflicts', 'Provides', 'Replaces')
+        if k in p.control}
     sodeps = []
     for row in p.p['so_provides']:
         sodeps.append((0,) + split_soname(row))
