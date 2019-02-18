@@ -94,7 +94,7 @@ def init_db(db, dbtype='sqlite'):
     cur.execute('CREATE MATERIALIZED VIEW IF NOT EXISTS v_packages_new AS '
                 'SELECT DISTINCT ON (repo, package) package, version, repo, '
                 '  architecture, filename, size, sha256, mtime, debtime, '
-                '  section, installed_size, maintainer, description '
+                '  section, installed_size, maintainer, description, _vercomp '
                 'FROM pv_packages '
                 'ORDER BY repo, package, _vercomp DESC')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_path'
