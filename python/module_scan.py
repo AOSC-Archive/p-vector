@@ -167,9 +167,6 @@ def scan_dir(db, base_dir: str, branch: str, component: str):
                 (repo, realname, comppath, BRANCHES.index(branch),
                 branch, component, pkginfo['architecture']))
             pkginfo['repo'] = repo
-            depinfo['package'] = pkginfo['package']
-            depinfo['version'] = pkginfo['version']
-            depinfo['repo'] = repo
             dbkey = (pkginfo['package'], pkginfo['version'], repo)
             if pkginfo['filename'] in dup_pkgs:
                 logger_scan.info('UPDATE %s', pkginfo['filename'])
