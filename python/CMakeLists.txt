@@ -8,4 +8,5 @@ install(FILES
         module_release.py
         module_scan.py
         module_check_elf.py
+        vercomp.sql
         DESTINATION ${LIBEXEC_PATH})
