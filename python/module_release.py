@@ -83,7 +83,8 @@ def gen_packages(db, dist_dir: str, branch_name: str, component_name: str):
         if row['section']:
             control['Section'] = row['section']
         for k, v in row['dep']:
-            control[k] = v
+            if k:
+                control[k] = v
         print(deb822.SortPackages(deb822.Packages(control)), file=f)
     for f in arch_packages.values():
         file_path = f.name
