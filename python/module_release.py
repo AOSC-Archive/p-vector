@@ -21,7 +21,7 @@ def generate(db, base_dir: str, conf_common: dict, conf_branches: dict):
             continue
         branch_name = i.name
         realbranchdir = os.path.join(dist_dir_real, branch_name)
-        inrel = PosixPath(realbranchdir).joinpath(InRelease)
+        inrel = PosixPath(realbranchdir).joinpath('InRelease')
         if inrel.is_file():
             mtime = inrel.stat().st_mtime
             cur = db.cursor()
