@@ -53,8 +53,11 @@ def scan_deb(args):
             pkginfo = {
                 'package': package, 'version': version, 'architecture': arch,
                 'filename': filename, 'size': size, 'mtime': mtime,
-                'sha256': internal_pkgscan.sha256_file(fullpath)
             }
+            try:
+                pkginfo['sha256'] = internal_pkgscan.sha256_file(fullpath)
+            except Exception:
+                logger_scan.exception('cannot access %s', fullpath)
             return pkginfo, {}, [], []
         raise
     # Make a new document
