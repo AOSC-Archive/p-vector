@@ -158,8 +158,8 @@ def init_index(db):
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_packages_new_package'
                 ' ON v_packages_new (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_dpkg_dependencies_package'
-                ' ON v_packages_new (package, version, repo)')
+                ' ON v_dpkg_dependencies (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_dpkg_dependencies_dep'
-                ' ON v_packages_new (relationship, deppkg, depvercomp)')
+                ' ON v_dpkg_dependencies (relationship, deppkg, depvercomp)')
     db.commit()
     cur.close()
