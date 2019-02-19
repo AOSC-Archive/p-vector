@@ -171,8 +171,9 @@ def gen_release(db, branch_name: str,
                 hash_list.append({
                     'sha256': sha256_file(str(path)),
                     'size': size,
-                    'name': PurePath(c).joinpath(filename)
+                    'name': str(PurePath(c).joinpath(filename))
                 })
+    hash_list.sort(key=lambda x: x['name'])
     r['SHA256'] = hash_list
     release_fn = branch_dir.joinpath('Release')
     with open(str(release_fn), 'w', encoding='UTF-8') as f:
