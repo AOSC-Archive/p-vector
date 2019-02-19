@@ -157,6 +157,7 @@ def gen_release(db, branch_name: str,
     hash_list = []
     for c in meta_data_list:
         for a in meta_data_list[c]:
+            has_contents = False
             for filename in (
                 'binary-%s/Packages' % a,
                 'binary-%s/Packages.xz' % a,
@@ -168,11 +169,22 @@ def gen_release(db, branch_name: str,
                     size = path.stat().st_size
                 except FileNotFoundError:
                     continue
+                fullpath = str(PurePath(c).joinpath(filename))
                 hash_list.append({
                     'sha256': sha256_file(str(path)),
                     'size': size,
-                    'name': str(PurePath(c).joinpath(filename))
+                    'name': fullpath
                 })
+                if filename.startswith('Contents'):
+                    if filename.endswith('.gz') and not has_contents:
+                        with gzip.open(str(path), 'rb') as f:
+                            size, sha256 = size_sha256_fp(f)
+                        hash_list.append({
+                            'sha256': sha256, 'size': size,
+                            'name': os.path.splitext(fullpath)[0]
+                        })
+                    else:
+                        has_contents = True
     hash_list.sort(key=lambda x: x['name'])
     r['SHA256'] = hash_list
     release_fn = branch_dir.joinpath('Release')

@@ -22,12 +22,18 @@ def scan(path: str):
     return PkgInfoWrapper(json.loads(result.decode('utf-8')))
 
 
-def sha256_file(path: str):
+def size_sha256_fp(f):
     result = hashlib.new('sha256')
+    size = 0
+    while True:
+        block = f.read(8192)
+        if not block:
+            break
+        size += len(block)
+        result.update(block)
+    return size, result.hexdigest()
+
+
+def sha256_file(path: str):
     with open(path, 'rb') as f:
-        while True:
-            block = f.read(8192)
-            if not block:
-                break
-            result.update(block)
-    return result.hexdigest()
+        return size_sha256_fp(f)[1]
