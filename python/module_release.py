@@ -28,8 +28,8 @@ def generate(db, base_dir: str, conf_common: dict, conf_branches: dict):
             cur.execute("SELECT max(mtime) FROM pv_packages p "
                 "INNER JOIN pv_repos r ON r.name=p.repo WHERE r.branch=%s",
                 (branch_name,))
-            cur.close()
             result = cur.fetchone()[0]
+            cur.close()
             if result and mtime > result:
                 shutil.copytree(realbranchdir, os.path.join(dist_dir, branch_name))
                 logger_rel.info('Skip generating Release for %s', branch_name)
