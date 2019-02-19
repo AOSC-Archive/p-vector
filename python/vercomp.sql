@@ -35,25 +35,4 @@ RETURNS text AS $$
   ) q1
 $$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE COST 200;
 
-CREATE OR REPLACE VIEW v_dpkg_dependencies AS
-SELECT package, version, repo, relationship, nr,
-  depspl[1] deppkg, depspl[2] deparch, depspl[3] relop, depspl[4] depver,
-  comparable_ver(depspl[4]) depvercomp
-FROM (
-  SELECT package, version, repo, relationship, nr, regexp_match(dep,
-    '^\s*([a-zA-Z0-9.+-]{2,})(?::([a-zA-Z0-9][a-zA-Z0-9-]*))?' ||
-    '(?:\s*\(\s*([>=<]+)\s*([0-9a-zA-Z:+~.-]+)\s*\))?(?:\s*\[[\s!\w-]+\])?' ||
-    '\s*(?:<.+>)?\s*$') depspl
-  FROM (
-    SELECT package, version, repo, relationship, nr,
-      unnest(string_to_array(dep, '|')) dep
-    FROM (
-      SELECT d.package, d.version, d.repo, d.relationship, v.nr, v.val dep
-      FROM pv_package_dependencies d
-      INNER JOIN LATERAL unnest(string_to_array(d.value, ','))
-        WITH ORDINALITY AS v(val, nr) ON TRUE
-    ) q1
-  ) q2
-) q3;
-
 -- test: 'libc6 (>= 2.3.6-6), libdb4.4, libgnutls13 (>= 1.4.0-0), libidn11 (>= 0.5.18), libncursesw5 (>= 5.4-5), libsasl2 (>= 2.1.19.dfsg1), exim4 | mail-transport-agent, perl:any, python:native'

@@ -14,6 +14,30 @@ def make_where(d):
     keys, values = zip(*d.items())
     return ' AND '.join(k + '=%s' for k in keys), values
 
+SQL_v_dpkg_dependencies = '''
+CREATE MATERIALIZED VIEW IF NOT EXISTS v_dpkg_dependencies AS
+SELECT package, version, repo, relationship, nr,
+  depspl[1] deppkg, depspl[2] deparch, depspl[3] relop, depspl[4] depver,
+  comparable_dpkgver(depspl[4]) depvercomp
+FROM (
+  SELECT package, version, repo, relationship, nr, regexp_match(dep,
+    '^\s*([a-zA-Z0-9.+-]{2,})(?::([a-zA-Z0-9][a-zA-Z0-9-]*))?' ||
+    '(?:\s*\(\s*([>=<]+)\s*([0-9a-zA-Z:+~.-]+)\s*\))?(?:\s*\[[\s!\w-]+\])?' ||
+    '\s*(?:<.+>)?\s*$') depspl
+  FROM (
+    SELECT package, version, repo, relationship, nr,
+      unnest(string_to_array(dep, '|')) dep
+    FROM (
+      SELECT d.package, d.version, d.repo, d.relationship, v.nr, v.val dep
+      FROM pv_package_dependencies d
+      INNER JOIN v_packages_new n USING (package, version, repo)
+      INNER JOIN LATERAL unnest(string_to_array(d.value, ','))
+        WITH ORDINALITY AS v(val, nr) ON TRUE
+    ) q1
+  ) q2
+) q3
+'''
+
 def init_db(db, dbtype='sqlite'):
     cur = db.cursor()
     cur.execute('CREATE TABLE IF NOT EXISTS pv_repos ('
@@ -97,6 +121,7 @@ def init_db(db, dbtype='sqlite'):
                 '  section, installed_size, maintainer, description, _vercomp '
                 'FROM pv_packages '
                 'ORDER BY repo, package, _vercomp DESC')
+    cur.execute(SQL_v_dpkg_dependencies)
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_path'
                 ' ON pv_repos (path, architecture)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_architecture'
@@ -129,7 +154,12 @@ def init_index(db):
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_files_path_name'
                 ' ON pv_package_files (path, name)')
     cur.execute('REFRESH MATERIALIZED VIEW v_packages_new')
+    cur.execute('REFRESH MATERIALIZED VIEW v_dpkg_dependencies')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_packages_new_package'
                 ' ON v_packages_new (package, version, repo)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_v_dpkg_dependencies_package'
+                ' ON v_packages_new (package, version, repo)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_v_dpkg_dependencies_dep'
+                ' ON v_packages_new (relationship, deppkg, depvercomp)')
     db.commit()
     cur.close()

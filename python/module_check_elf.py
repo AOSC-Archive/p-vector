@@ -33,17 +33,25 @@ SELECT
   f2.package package2, f2.version version2, f2.repo repo2,
   f1.path || '/' || f1.name filename
 FROM pv_package_files f1
-INNER JOIN v_packages_new v1
-ON v1.package=f1.package AND v1.version=f1.version AND v1.repo=f1.repo
-INNER JOIN pv_repos r1 ON r1.name=v1.repo
+INNER JOIN pv_repos r1 ON r1.name=f1.repo
 INNER JOIN pv_repos r2 ON r2.architecture IN (r1.architecture, 'all')
 AND r2.testing<=r1.testing AND r2.component=r1.component
 INNER JOIN v_packages_new v2
-ON v2.repo=r2.name AND v2.package!=v1.package
+ON v2.repo=r2.name AND v2.package!=f1.package
 INNER JOIN pv_package_files f2
 ON v2.package=f2.package AND v2.version=f2.version AND v2.repo=f2.repo
 AND f2.path=f1.path AND f2.name=f1.name
-WHERE f1.ftype='reg'
+LEFT JOIN v_dpkg_dependencies d1
+ON d1.package=f1.package AND d1.version=f1.version AND d1.repo=f1.repo
+AND d1.relationship IN ('Breaks', 'Replaces', 'Conflicts')
+AND d1.deppkg=v2.package AND (d1.deparch IS NULL OR d1.deparch=r2.architecture)
+AND (CASE WHEN relop IS NULL THEN TRUE
+  WHEN relop='<<' THEN v2._vercomp < d1.depvercomp
+  WHEN relop='<=' THEN v2._vercomp <= d1.depvercomp
+  WHEN relop='=' THEN v2._vercomp = d1.depvercomp
+  WHEN relop='>=' THEN v2._vercomp >= d1.depvercomp
+  WHEN relop='>>' THEN v2._vercomp > d1.depvercomp END)
+WHERE f1.ftype='reg' AND d1.package IS NULL
 """
 
 aggregate_args = [
