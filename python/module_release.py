@@ -7,7 +7,7 @@ import subprocess
 from pathlib import PosixPath, PurePath
 
 import deb822
-from internal_pkgscan import sha256_file
+from internal_pkgscan import sha256_file, size_sha256_fp
 
 logger_rel = logging.getLogger('REL')
 
