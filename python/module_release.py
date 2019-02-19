@@ -14,10 +14,26 @@ logger_rel = logging.getLogger('REL')
 def generate(db, base_dir: str, conf_common: dict, conf_branches: dict):
     dist_dir = base_dir + '/dists.new'
     pool_dir = base_dir + '/pool'
+    dist_dir_real = base_dir + '/dists'
+    dist_dir_old = base_dir + '/dists.old'
     for i in PosixPath(pool_dir).iterdir():
         if not i.is_dir():
             continue
         branch_name = i.name
+        realbranchdir = os.path.join(dist_dir_real, branch_name)
+        inrel = PosixPath(realbranchdir).joinpath(InRelease)
+        if inrel.is_file():
+            mtime = inrel.stat().st_mtime
+            cur = db.cursor()
+            cur.execute("SELECT max(mtime) FROM pv_packages p "
+                "INNER JOIN pv_repos r ON r.name=p.repo WHERE r.branch=%s",
+                (branch_name,))
+            cur.close()
+            result = cur.fetchone()[0]
+            if result and mtime > result:
+                shutil.copytree(realbranchdir, os.path.join(dist_dir, branch_name))
+                logger_rel.info('Skip generating Release for %s', branch_name)
+                continue
         component_name_list = []
         for j in PosixPath(pool_dir).joinpath(branch_name).iterdir():
             if not j.is_dir():
@@ -33,8 +49,6 @@ def generate(db, base_dir: str, conf_common: dict, conf_branches: dict):
         conf.update(conf_branches[branch_name])
         logger_rel.info('Generating Release for %s', branch_name)
         gen_release(db, branch_name, component_name_list, dist_dir, conf)
-    dist_dir_real = base_dir + '/dists'
-    dist_dir_old = base_dir + '/dists.old'
     if PosixPath(dist_dir_real).exists():
         os.rename(dist_dir_real, dist_dir_old)
     os.rename(dist_dir, dist_dir_real)
