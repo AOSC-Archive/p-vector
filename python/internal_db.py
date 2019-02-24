@@ -120,6 +120,7 @@ def init_db(db, dbtype='sqlite'):
                 '  architecture, filename, size, sha256, mtime, debtime, '
                 '  section, installed_size, maintainer, description, _vercomp '
                 'FROM pv_packages '
+                'WHERE debtime IS NOT NULL '
                 'ORDER BY repo, package, _vercomp DESC')
     cur.execute(SQL_v_dpkg_dependencies)
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_path'

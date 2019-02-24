@@ -160,6 +160,7 @@ def scan_dir(db, base_dir: str, branch: str, component: str):
         for pkginfo, depinfo, sodeps, files in mpool.imap_unordered(
             scan_deb, check_list, 5):
             realname = pkginfo['architecture']
+            validdeb = ('debtime' in pkginfo)
             if realname == 'all':
                 realname = 'noarch'
             if component != 'main':
@@ -172,11 +173,12 @@ def scan_dir(db, base_dir: str, branch: str, component: str):
             pkginfo['repo'] = repo
             dbkey = (pkginfo['package'], pkginfo['version'], repo)
             if pkginfo['filename'] in dup_pkgs:
-                logger_scan.info('UPDATE %s', pkginfo['filename'])
-                module_ipc.publish_change(
-                    compname, pkginfo['package'], pkginfo['architecture'],
-                    'overwrite', pkginfo['version'], pkginfo['version']
-                )
+                if validdeb:
+                    logger_scan.info('UPDATE %s', pkginfo['filename'])
+                    module_ipc.publish_change(
+                        compname, pkginfo['package'], pkginfo['architecture'],
+                        'overwrite', pkginfo['version'], pkginfo['version']
+                    )
             else:
                 cur.execute("SELECT version, filename FROM pv_packages "
                     "WHERE package=%s AND repo=%s", (pkginfo['package'], repo))
@@ -186,13 +188,15 @@ def scan_dir(db, base_dir: str, branch: str, component: str):
                     vercomp = internal_dpkg_version.dpkg_version_compare(
                         oldver[0], pkginfo['version'])
                     if vercomp == -1:
-                        logger_scan.info('NEWER  %s %s %s >> %s',
-                            pkginfo['architecture'], pkginfo['package'],
-                            pkginfo['version'], oldver[0])
-                        module_ipc.publish_change(
-                            compname, pkginfo['package'], pkginfo['architecture'],
-                            'upgrade', oldver[0], pkginfo['version']
-                        )
+                        if validdeb:
+                            logger_scan.info('NEWER  %s %s %s >> %s',
+                                pkginfo['architecture'], pkginfo['package'],
+                                pkginfo['version'], oldver[0])
+                            module_ipc.publish_change(
+                                compname, pkginfo['package'],
+                                pkginfo['architecture'], 'upgrade',
+                                oldver[0], pkginfo['version']
+                            )
                     elif vercomp:
                         logger_scan.warning('OLD    %s %s %s',
                             pkginfo['architecture'], pkginfo['package'],
@@ -213,7 +217,7 @@ def scan_dir(db, base_dir: str, branch: str, component: str):
                             "WHERE package=%s AND version=%s AND repo=%s", dbkey)
                         logger_scan.error('DUP    %s == %s',
                             oldver[1], pkginfo['filename'])
-                else:
+                elif validdeb:
                     logger_scan.info('NEW    %s %s %s', pkginfo['architecture'],
                         pkginfo['package'], pkginfo['version'])
                     module_ipc.publish_change(
