@@ -142,7 +142,7 @@ def init_db(db, dbtype='sqlite'):
             db.commit()
     cur.close()
 
-def init_index(db):
+def init_index(db, refresh=True):
     cur = db.cursor()
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_packages_vercomp'
                 ' ON pv_packages (repo, package, _vercomp DESC)')
@@ -154,8 +154,9 @@ def init_index(db):
                 ' ON pv_package_files (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_files_path_name'
                 ' ON pv_package_files (path, name)')
-    cur.execute('REFRESH MATERIALIZED VIEW v_packages_new')
-    cur.execute('REFRESH MATERIALIZED VIEW v_dpkg_dependencies')
+    if refresh:
+        cur.execute('REFRESH MATERIALIZED VIEW v_packages_new')
+        cur.execute('REFRESH MATERIALIZED VIEW v_dpkg_dependencies')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_packages_new_package'
                 ' ON v_packages_new (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_dpkg_dependencies_package'

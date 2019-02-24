@@ -237,9 +237,17 @@ def scan_dir(db, base_dir: str, branch: str, component: str):
                 cur.execute("INSERT INTO pv_package_files VALUES "
                     "(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", dbkey + row)
 
+def table_mtime(db):
+    cur = db.cursor()
+    cur.execute("SELECT max(mtime) FROM pv_packages")
+    result = cur.fetchone()[0]
+    cur.close()
+    return result
+
 def scan(db, base_dir: str):
     pool_dir = base_dir + '/pool'
     internal_db.init_db(db)
+    lastmtime = table_mtime(db)
     for i in PosixPath(pool_dir).iterdir():
         if not i.is_dir():
             continue
@@ -254,5 +262,6 @@ def scan(db, base_dir: str):
                 scan_dir(db, base_dir, branch_name, component_name)
             finally:
                 db.commit()
-    internal_db.init_index(db)
+    refresh = (table_mtime(db) > lastmtime)
+    internal_db.init_index(db, refresh)
     #db.execute('ANALYZE')
