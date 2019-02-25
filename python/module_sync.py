@@ -67,22 +67,18 @@ def make_copy(dbname, table, fd, idxcol=None):
             f.write('\n')
     db.close()
 
-def sync_table(pgdb, dbname, table, idxcol=None, prefix=None):
-    cur = pgdb.cursor()
+def sync_table(cur, dbname, table, idxcol=None, prefix=None):
     logger_sync.info('- Table %s', table)
     if prefix:
         pgtable = prefix + table
     else:
         pgtable = table
-    cur.execute("TRUNCATE " + pgtable)
     pr, pw = os.pipe()
     thr = threading.Thread(target=make_copy, args=(dbname, table, pw, idxcol))
     thr.start()
     with open(pr, 'rb') as f:
         cur.copy_from(f, pgtable)
     thr.join()
-    cur.close()
-    pgdb.commit()
 
 def sync_db(db):
     cur = db.cursor()
@@ -107,11 +103,15 @@ def sync_db(db):
                 continue
             logger_sync.info('Syncing %s', dbname)
             for table in tables:
-                sync_table(db, filename, table)
+                cur.execute("TRUNCATE " + table)
+                sync_table(cur, filename, table)
             os.remove(filename)
             db.commit()
         cur.execute("SELECT name, tid FROM trees")
         treeids = dict(cur)
+        for table in MARKS_TABLES:
+            cur.execute("TRUNCATE repo_" + table)
+        cur.execute("TRUNCATE repo_committers")
         for srcrepo in SRCREPOS:
             dbname = srcrepo + MARKS_DB_SFX
             tid = treeids[srcrepo]
@@ -123,7 +123,7 @@ def sync_db(db):
                 continue
             logger_sync.info('Syncing %s', dbname)
             for table in MARKS_TABLES:
-                sync_table(db, filename, table, tid, 'repo_')
-            sync_table(db, filename, 'committers', prefix='repo_')
+                sync_table(cur, filename, table, tid, 'repo_')
+            sync_table(cur, filename, 'committers', prefix='repo_')
             os.remove(filename)
             db.commit()
