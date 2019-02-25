@@ -8,7 +8,7 @@ import psycopg2
 import psycopg2.extras
 
 sys.path.insert(0, os.path.normpath(os.path.dirname(__file__) + '/../libexec/p-vector'))
-import module_db
+import internal_db
 import module_ipc
 import module_scan
 import module_sync
@@ -56,7 +56,9 @@ def main():
     elif action == 'sync':
         module_sync.sync_db(db)
     elif action == 'reset':
-        module_db.drop_tables(db, action_args[0])
+        arg = action_args[0]
+        assert input("Please confirm to reset tables for %s [YES]: " % arg) == 'YES'
+        internal_db.drop_tables(db, arg)
     else:
         usage()
 
