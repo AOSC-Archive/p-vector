@@ -60,7 +60,7 @@ missingcnt INTEGER
 CREATE INDEX idx_package_dependencies_rev ON package_dependencies (dependency);
 
 CREATE OR REPLACE VIEW v_packages AS
-SELECT p.name name, p.tree tree, t.category tree_category,
+SELECT p.name, p.tree tree, t.category tree_category,
   pv.branch branch, p.category category,
   section, pkg_section, directory, description, version,
   ((CASE WHEN ifnull(epoch, '') = '' THEN ''
