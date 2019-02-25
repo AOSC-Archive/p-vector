@@ -63,7 +63,8 @@ laggingcnt INTEGER,
 missingcnt INTEGER
 -- FOREIGN KEY(repo) REFERENCES dpkg_repos(name)
 );
-CREATE INDEX idx_package_dependencies_rev ON package_dependencies (dependency);
+CREATE INDEX IF NOT EXISTS idx_package_dependencies_rev
+ON package_dependencies (dependency);
 
 CREATE OR REPLACE VIEW v_packages AS
 SELECT p.name, p.tree tree, t.category tree_category,
