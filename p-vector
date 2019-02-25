@@ -26,7 +26,7 @@ def usage():
     sys.exit(1)
 
 def main():
-    if len(sys.argv) != 3:
+    if len(sys.argv) < 3:
         usage()
 
     conf_file = sys.argv[1]
