@@ -102,6 +102,8 @@ def sync_db(db):
                 logger_sync.info('Skip %s', dbname)
                 continue
             logger_sync.info('Syncing %s', dbname)
+            cur.execute("DELETE FROM pv_dbsync WHERE name=%s", (dbname,))
+            cur.execute("INSERT INTO pv_dbsync (name, etag) VALUES (%s,%s)", (dbname, newetag))
             for table in tables:
                 cur.execute("TRUNCATE " + table)
                 sync_table(cur, filename, table)
@@ -121,6 +123,8 @@ def sync_db(db):
             if newetag == etags.get(dbname):
                 logger_sync.info('Skip %s', dbname)
                 continue
+            cur.execute("DELETE FROM pv_dbsync WHERE name=%s", (dbname,))
+            cur.execute("INSERT INTO pv_dbsync (name, etag) VALUES (%s,%s)", (dbname, newetag))
             logger_sync.info('Syncing %s', dbname)
             for table in MARKS_TABLES:
                 sync_table(cur, filename, table, tid, 'repo_')
