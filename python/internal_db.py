@@ -1,6 +1,9 @@
 
 import os
+import logging
 import psycopg2
+
+logger_db = logging.getLogger('DB')
 
 def make_insert(d):
     keys, values = zip(*d.items())
@@ -115,6 +118,19 @@ def init_db(db, dbtype='sqlite'):
                 'gname TEXT'
                 # 'PRIMARY KEY (package, version, repo, path, name)'
                 ')')
+    cur.execute('CREATE TABLE IF NOT EXISTS pv_package_issues ('
+                'package TEXT,'
+                'repo TEXT,'
+                'errno INTEGER,'
+                'warning BOOLEAN,'
+                'filename TEXT,'
+                'ctime TIMESTAMP WITH TIME ZONE,'
+                'mtime TIMESTAMP WITH TIME ZONE,'
+                'atime TIMESTAMP WITH TIME ZONE,'
+                'description TEXT,'
+                'detail JSONB,'
+                'PRIMARY KEY (package, repo, errno, warning, filename)'
+                ')')
     cur.execute('CREATE MATERIALIZED VIEW IF NOT EXISTS v_packages_new AS '
                 'SELECT DISTINCT ON (repo, package) package, version, repo, '
                 '  architecture, filename, size, sha256, mtime, debtime, '
@@ -165,3 +181,24 @@ def init_index(db, refresh=True):
                 ' ON v_dpkg_dependencies (relationship, deppkg, depvercomp)')
     db.commit()
     cur.close()
+
+TABLES_PV = ('pv_package_dependencies', 'pv_package_duplicate', 
+    'pv_package_files', 'pv_package_sodep', 'pv_packages', 'pv_repos')
+
+TABLES_PKGS = ('pv_dbsync', 'trees', 'tree_branches', 'packages',
+    'package_duplicate', 'package_versions', 'package_spec',
+    'package_dependencies', 'dpkg_repo_stats', 'upstream_status', 
+    'package_upstream', 'anitya_link', 'anitya_projects', 'repo_marks', 
+    'repo_committers', 'repo_package_rel', 'repo_branches')
+
+def drop_tables(db, ttype):
+    cur = db.cursor()
+    if ttype in ('all', 'pv'):
+        for table in TABLES_PV:
+            cur.execute("DROP TABLE IF EXISTS %s CASCADE" % table)
+            logger_db.info(cur.statusmessage)
+    if ttype in ('all', 'sync'):
+        for table in TABLES_PKGS:
+            cur.execute("DROP TABLE IF EXISTS %s CASCADE" % table)
+            logger_db.info(cur.statusmessage)
+    db.commit()

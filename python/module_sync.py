@@ -67,15 +67,19 @@ def make_copy(dbname, table, fd, idxcol=None):
             f.write('\n')
     db.close()
 
-def sync_table(pgdb, dbname, table, idxcol=None):
+def sync_table(pgdb, dbname, table, idxcol=None, prefix=None):
     cur = pgdb.cursor()
     logger_sync.info('- Table %s', table)
-    cur.execute("TRUNCATE " + table)
+    if prefix:
+        pgtable = prefix + table
+    else:
+        pgtable = table
+    cur.execute("TRUNCATE " + pgtable)
     pr, pw = os.pipe()
     thr = threading.Thread(target=make_copy, args=(dbname, table, pw, idxcol))
     thr.start()
     with open(pr, 'rb') as f:
-        cur.copy_from(f, table)
+        cur.copy_from(f, pgtable)
     thr.join()
     cur.close()
     pgdb.commit()
@@ -119,7 +123,7 @@ def sync_db(db):
                 continue
             logger_sync.info('Syncing %s', dbname)
             for table in MARKS_TABLES:
-                sync_table(db, filename, table, tid)
-            sync_table(db, filename, 'committers')
+                sync_table(db, filename, table, tid, 'repo_')
+            sync_table(db, filename, 'committers', prefix='repo_')
             os.remove(filename)
             db.commit()

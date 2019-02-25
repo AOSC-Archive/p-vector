@@ -82,13 +82,13 @@ LEFT JOIN package_versions pv
 
 -- piss.db
 
-CREATE TABLE upstream_status (
+CREATE TABLE IF NOT EXISTS upstream_status (
 package TEXT PRIMARY KEY,
 updated INTEGER,
 last_try INTEGER,
 err TEXT
 );
-CREATE TABLE package_upstream (
+CREATE TABLE IF NOT EXISTS package_upstream (
 package TEXT PRIMARY KEY,
 type TEXT,
 version TEXT,
@@ -96,11 +96,11 @@ version TEXT,
 url TEXT,
 tarball TEXT
 );
-CREATE TABLE anitya_link (
+CREATE TABLE IF NOT EXISTS anitya_link (
 package TEXT PRIMARY KEY,
 projectid INTEGER
 );
-CREATE TABLE anitya_projects (
+CREATE TABLE IF NOT EXISTS anitya_projects (
 id INTEGER PRIMARY KEY,
 name TEXT,
 homepage TEXT,
@@ -112,10 +112,10 @@ latest_version TEXT,
 updated_on INTEGER,
 created_on INTEGER
 );
-CREATE INDEX idx_anitya_link ON anitya_link (projectid);
-CREATE INDEX idx_anitya_projects ON anitya_projects (name);
+CREATE INDEX IF NOT EXISTS idx_anitya_link ON anitya_link (projectid);
+CREATE INDEX IF NOT EXISTS idx_anitya_projects ON anitya_projects (name);
 
-CREATE VIEW v_package_upstream AS
+CREATE OR REPLACE VIEW v_package_upstream AS
 SELECT
   package, coalesce(pu.version, ap.latest_version) "version",
   coalesce(pu.time, ap.updated_on) updated,
@@ -132,7 +132,7 @@ LEFT JOIN anitya_projects ap ON al.projectid=ap.id;
 
 -- *-marks.db
 
-CREATE TABLE marks (
+CREATE TABLE IF NOT EXISTS repo_marks (
 tree SMALLINT,
 name TEXT,
 rid INTEGER,
@@ -140,11 +140,11 @@ uuid TEXT,
 githash TEXT,
 PRIMARY KEY (tree, name)
 );
-CREATE TABLE committers (
+CREATE TABLE IF NOT EXISTS repo_committers (
 email TEXT PRIMARY KEY,
 name TEXT
 );
-CREATE TABLE package_rel (
+CREATE TABLE IF NOT EXISTS repo_package_rel (
 tree SMALLINT,
 rid INTEGER,
 package TEXT,
@@ -154,12 +154,12 @@ epoch TEXT,
 message TEXT,
 PRIMARY KEY (tree, rid, package)
 );
-CREATE TABLE branches (
+CREATE TABLE IF NOT EXISTS repo_branches (
 tree SMALLINT,
 rid INTEGER,
 tagid INTEGER,
 tagname TEXT,
 PRIMARY KEY (tree, rid, tagid)
 );
-CREATE INDEX idx_marks ON marks (rid, tree);
-CREATE INDEX idx_package_rel ON package_rel (package);
+CREATE INDEX IF NOT EXISTS idx_repo_marks ON repo_marks (rid, tree);
+CREATE INDEX IF NOT EXISTS idx_repo_package_rel ON repo_package_rel (package);

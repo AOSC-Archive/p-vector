@@ -8,6 +8,7 @@ import psycopg2
 import psycopg2.extras
 
 sys.path.insert(0, os.path.normpath(os.path.dirname(__file__) + '/../libexec/p-vector'))
+import module_db
 import module_ipc
 import module_scan
 import module_sync
@@ -20,14 +21,17 @@ logging.basicConfig(
 conf_common = None
 conf_branches = {}
 
+def usage():
+    print('Usage: %s CONF (scan|release|sync|reset)' % sys.argv[0], file=sys.stderr)
+    sys.exit(1)
 
 def main():
     if len(sys.argv) != 3:
-        print('Usage: %s CONF (scan|release)' % sys.argv[0], file=sys.stderr)
-        exit(1)
+        usage()
 
     conf_file = sys.argv[1]
     action = sys.argv[2]
+    action_args = sys.argv[3:]
 
     with open(conf_file, 'rb') as f:
         y = yaml.load_all(f)
@@ -51,6 +55,10 @@ def main():
         module_release.generate(db, base_dir, conf_common, conf_branches)
     elif action == 'sync':
         module_sync.sync_db(db)
+    elif action == 'reset':
+        module_db.drop_tables(db, action_args[0])
+    else:
+        usage()
 
 
 if __name__ == '__main__':
