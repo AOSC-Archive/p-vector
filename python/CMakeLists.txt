@@ -7,6 +7,7 @@ install(FILES
         module_ipc.py
         module_release.py
         module_scan.py
+        module_sync.py
         module_check_elf.py
         vercomp.sql
         DESTINATION ${LIBEXEC_PATH})
