@@ -21,7 +21,7 @@ TABLES = (
     )),
 )
 SRCREPOS = ("aosc-os-core", "aosc-os-abbs", "aosc-os-arm-bsps")
-MARKS_TABLES = ("marks", "package_rel", "branches")
+MARKS_TABLES = ("marks", "committers", "package_rel", "branches")
 MARKS_DB_SFX = "-marks.db"
 
 logger_sync = logging.getLogger('SYNC')
@@ -113,7 +113,6 @@ def sync_db(db):
         treeids = dict(cur)
         for table in MARKS_TABLES:
             cur.execute("TRUNCATE repo_" + table)
-        cur.execute("TRUNCATE repo_committers")
         for srcrepo in SRCREPOS:
             dbname = srcrepo + MARKS_DB_SFX
             tid = treeids[srcrepo]
@@ -128,6 +127,5 @@ def sync_db(db):
             logger_sync.info('Syncing %s', dbname)
             for table in MARKS_TABLES:
                 sync_table(cur, filename, table, tid, 'repo_')
-            sync_table(cur, filename, 'committers', prefix='repo_')
             os.remove(filename)
             db.commit()

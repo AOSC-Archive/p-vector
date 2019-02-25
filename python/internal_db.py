@@ -182,8 +182,9 @@ def init_index(db, refresh=True):
     db.commit()
     cur.close()
 
-TABLES_PV = ('pv_package_dependencies', 'pv_package_duplicate', 
-    'pv_package_files', 'pv_package_sodep', 'pv_packages', 'pv_repos')
+TABLES_PV = ('pv_package_dependencies', 'pv_package_duplicate',
+    'pv_package_files', 'pv_package_sodep', 'pv_packages', 'pv_repos',
+    'pv_package_issues')
 
 TABLES_PKGS = ('pv_dbsync', 'trees', 'tree_branches', 'packages',
     'package_duplicate', 'package_versions', 'package_spec',

@@ -141,8 +141,10 @@ githash TEXT,
 PRIMARY KEY (tree, name)
 );
 CREATE TABLE IF NOT EXISTS repo_committers (
-email TEXT PRIMARY KEY,
-name TEXT
+tree SMALLINT,
+email TEXT,
+name TEXT,
+PRIMARY KEY (tree, email)
 );
 CREATE TABLE IF NOT EXISTS repo_package_rel (
 tree SMALLINT,
