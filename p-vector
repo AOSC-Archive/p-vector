@@ -10,6 +10,7 @@ import psycopg2.extras
 sys.path.insert(0, os.path.normpath(os.path.dirname(__file__) + '/../libexec/p-vector'))
 import module_ipc
 import module_scan
+import module_sync
 import module_release
 
 logging.basicConfig(
@@ -48,6 +49,8 @@ def main():
         module_scan.scan(db, base_dir)
     elif action == 'release':
         module_release.generate(db, base_dir, conf_common, conf_branches)
+    elif action == 'sync':
+        module_sync.sync_db(db)
 
 
 if __name__ == '__main__':
