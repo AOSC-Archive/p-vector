@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS package_spec (
 package TEXT,
 key TEXT,
 value TEXT,
-PRIMARY KEY (package, key),
+PRIMARY KEY (package, key)
 -- FOREIGN KEY(package) REFERENCES packages(name)
 );
 CREATE TABLE IF NOT EXISTS package_dependencies (
@@ -46,7 +46,7 @@ package TEXT,
 dependency TEXT,
 version TEXT,
 relationship TEXT,
-PRIMARY KEY (package, dependency, relationship),
+PRIMARY KEY (package, dependency, relationship)
 -- FOREIGN KEY(package) REFERENCES packages(name)
 );
 CREATE TABLE IF NOT EXISTS dpkg_repo_stats (
@@ -54,7 +54,7 @@ repo TEXT PRIMARY KEY,
 packagecnt INTEGER,
 ghostcnt INTEGER,
 laggingcnt INTEGER,
-missingcnt INTEGER,
+missingcnt INTEGER
 -- FOREIGN KEY(repo) REFERENCES dpkg_repos(name)
 );
 CREATE INDEX idx_package_dependencies_rev ON package_dependencies (dependency);
