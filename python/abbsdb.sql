@@ -63,9 +63,9 @@ CREATE OR REPLACE VIEW v_packages AS
 SELECT p.name, p.tree tree, t.category tree_category,
   pv.branch branch, p.category category,
   section, pkg_section, directory, description, version,
-  ((CASE WHEN ifnull(epoch, '') = '' THEN ''
+  ((CASE WHEN coalesce(epoch, '') = '' THEN ''
     ELSE epoch || ':' END) || version ||
-   (CASE WHEN ifnull(release, '') IN ('', '0') THEN ''
+   (CASE WHEN coalesce(release, '') IN ('', '0') THEN ''
     ELSE '-' || release END)) full_version,
   pv.commit_time commit_time, pv.committer committer
 FROM packages p
