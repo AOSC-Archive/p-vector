@@ -110,7 +110,7 @@ CREATE INDEX idx_anitya_projects ON anitya_projects (name);
 
 CREATE VIEW v_package_upstream AS
 SELECT
-  package, coalesce(pu.version, ap.latest_version) version,
+  package, coalesce(pu.version, ap.latest_version) "version",
   coalesce(pu.time, ap.updated_on) updated,
   coalesce(pu.url, ('https://release-monitoring.org/project/' || ap.id || '/')) url,
   pu.tarball
