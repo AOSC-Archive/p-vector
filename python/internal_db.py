@@ -196,9 +196,9 @@ def drop_tables(db, ttype):
     if ttype in ('all', 'pv'):
         for table in TABLES_PV:
             cur.execute("DROP TABLE IF EXISTS %s CASCADE" % table)
-            logger_db.info(cur.query)
+            logger_db.info(cur.query.decode('utf-8'))
     if ttype in ('all', 'sync'):
         for table in TABLES_PKGS:
             cur.execute("DROP TABLE IF EXISTS %s CASCADE" % table)
-            logger_db.info(cur.query)
+            logger_db.info(cur.query.decode('utf-8'))
     db.commit()
