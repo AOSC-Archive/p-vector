@@ -10,4 +10,5 @@ install(FILES
         module_sync.py
         module_check_elf.py
         vercomp.sql
+        abbsdb.sql
         DESTINATION ${LIBEXEC_PATH})

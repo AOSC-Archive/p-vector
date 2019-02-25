@@ -84,11 +84,11 @@ def sync_db(db):
     cur.execute("CREATE TABLE IF NOT EXISTS pv_dbsync ("
                 "name TEXT PRIMARY KEY,"
                 "etag TEXT,"
-                "updated TIMESTAMP WITH TIME ZONE DEFAULT (now()),"
+                "updated TIMESTAMP WITH TIME ZONE DEFAULT (now())"
                 ")")
     cur.execute("SELECT name, etag FROM pv_dbsync")
     etags = dict(cur)
-    sqlfile = os.path.join(os.path.dirname(__file__), 'vercomp.sql')
+    sqlfile = os.path.join(os.path.dirname(__file__), 'abbsdb.sql')
     with open(sqlfile, 'r', encoding='utf-8') as f:
         cur.execute(f.read())
     db.commit()
