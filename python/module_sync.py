@@ -12,8 +12,9 @@ URLBASE = 'https://packages.aosc.io/data/'
 
 TABLES = (
     ("abbs.db", (
-        "trees", "packages", "package_duplicate", "package_versions",
-        "package_spec", "package_dependencies", "dpkg_repo_stats"
+        "trees", "tree_branches", "packages", "package_duplicate",
+        "package_versions", "package_spec", "package_dependencies",
+        "dpkg_repo_stats"
     )),
     ("piss.db", (
         "upstream_status", "package_upstream", "anitya_link", "anitya_projects"

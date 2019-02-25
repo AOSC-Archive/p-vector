@@ -7,6 +7,12 @@ category TEXT,
 url TEXT,
 mainbranch TEXT
 );
+CREATE TABLE IF NOT EXISTS tree_branches (
+tree TEXT,
+branch TEXT,
+priority INTEGER,
+PRIMARY KEY (tree, branch)
+);
 CREATE TABLE IF NOT EXISTS packages (
 name TEXT PRIMARY KEY,
 tree TEXT,
