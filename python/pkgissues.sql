@@ -112,7 +112,7 @@ AND (CASE WHEN d2.relop IS NULL THEN TRUE
   WHEN d2.relop='>>' THEN v1._vercomp > d2.depvercomp END)
 WHERE f1.ftype='reg' AND d1.package IS NULL AND d2.package IS NULL
 UNION ALL ----- 431 -----
-SELECT DISTINCT ON (package, version, repo, name, ver)
+SELECT DISTINCT ON (package, version, repo, filename)
   package, version, repo, 431::int errno, 0::smallint "level",
   (name || ver) filename, CASE WHEN package_lib IS NULL THEN NULL ELSE
     jsonb_object('{repo, package, version, sover_provide}',
@@ -139,7 +139,7 @@ FROM (
   WINDOW w AS (PARTITION BY sd.package, sd.version, sd.repo, sd.name, sd.ver)
 ) q1
 WHERE matchcnt=0
-ORDER BY package, version, repo, name, ver, comparable_ver(ver_provide) DESC
+ORDER BY package, version, repo, filename, comparable_ver(ver_provide) DESC
 ;
 
 DELETE FROM pv_package_issues WHERE id IN (
