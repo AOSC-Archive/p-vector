@@ -75,42 +75,47 @@ INNER JOIN pv_packages p USING (package, version, repo)
 GROUP BY d.package, d.version, d.repo
 UNION ALL ----- 421 -----
 SELECT
-  f1.package, f1.version, f1.repo, 421::int errno, 0::smallint "level",
-  '/' || f1.path || '/' || f1.name filename,
-  jsonb_object('{repo, package, version}',
-    ARRAY[f2.repo, f2.package, f2.version]) detail
-FROM pv_package_files f1
-INNER JOIN v_packages_new v1
-ON v1.package=f1.package AND v1.version=f1.version AND v1.repo=f1.repo
-INNER JOIN pv_repos r1 ON r1.name=v1.repo
-INNER JOIN pv_repos r2 ON r2.architecture IN (r1.architecture, 'all')
-AND r2.testing<=r1.testing AND r2.component=r1.component
-INNER JOIN v_packages_new v2
-ON v2.repo=r2.name AND v2.package!=v1.package
-INNER JOIN pv_package_files f2
-ON v2.package=f2.package AND v2.version=f2.version AND v2.repo=f2.repo
-AND f2.path=f1.path AND f2.name=f1.name
-LEFT JOIN v_dpkg_dependencies d1
-ON d1.package=f1.package AND d1.version=f1.version AND d1.repo=f1.repo
-AND d1.relationship IN ('Breaks', 'Replaces', 'Conflicts')
-AND d1.deppkg=v2.package AND (d1.deparch IS NULL OR d1.deparch=r2.architecture)
-AND (CASE WHEN d1.relop IS NULL THEN TRUE
-  WHEN d1.relop='<<' THEN v2._vercomp < d1.depvercomp
-  WHEN d1.relop='<=' THEN v2._vercomp <= d1.depvercomp
-  WHEN d1.relop='=' THEN v2._vercomp = d1.depvercomp
-  WHEN d1.relop='>=' THEN v2._vercomp >= d1.depvercomp
-  WHEN d1.relop='>>' THEN v2._vercomp > d1.depvercomp END)
-LEFT JOIN v_dpkg_dependencies d2
-ON d2.package=v2.package AND d2.version=v2.version AND d2.repo=v2.repo
-AND d2.relationship IN ('Breaks', 'Replaces', 'Conflicts')
-AND d2.deppkg=f1.package AND (d2.deparch IS NULL OR d2.deparch=r1.architecture)
-AND (CASE WHEN d2.relop IS NULL THEN TRUE
-  WHEN d2.relop='<<' THEN v1._vercomp < d2.depvercomp
-  WHEN d2.relop='<=' THEN v1._vercomp <= d2.depvercomp
-  WHEN d2.relop='=' THEN v1._vercomp = d2.depvercomp
-  WHEN d2.relop='>=' THEN v1._vercomp >= d2.depvercomp
-  WHEN d2.relop='>>' THEN v1._vercomp > d2.depvercomp END)
-WHERE f1.ftype='reg' AND d1.package IS NULL AND d2.package IS NULL
+  package, version, repo, errno, "level", filename, detail
+FROM (
+  SELECT DISTINCT ON (package, version, repo, filename)
+    f1.package, f1.version, f1.repo, 421::int errno, 0::smallint "level",
+    '/' || f1.path || '/' || f1.name filename,
+    jsonb_object('{repo, package, version}',
+      ARRAY[f2.repo, f2.package, f2.version]) detail
+  FROM pv_package_files f1
+  INNER JOIN v_packages_new v1
+  ON v1.package=f1.package AND v1.version=f1.version AND v1.repo=f1.repo
+  INNER JOIN pv_repos r1 ON r1.name=v1.repo
+  INNER JOIN pv_repos r2 ON r2.architecture IN (r1.architecture, 'all')
+  AND r2.testing<=r1.testing AND r2.component=r1.component
+  INNER JOIN v_packages_new v2
+  ON v2.repo=r2.name AND v2.package!=v1.package
+  INNER JOIN pv_package_files f2
+  ON v2.package=f2.package AND v2.version=f2.version AND v2.repo=f2.repo
+  AND f2.path=f1.path AND f2.name=f1.name
+  LEFT JOIN v_dpkg_dependencies d1
+  ON d1.package=f1.package AND d1.version=f1.version AND d1.repo=f1.repo
+  AND d1.relationship IN ('Breaks', 'Replaces', 'Conflicts')
+  AND d1.deppkg=v2.package AND (d1.deparch IS NULL OR d1.deparch=r2.architecture)
+  AND (CASE WHEN d1.relop IS NULL THEN TRUE
+    WHEN d1.relop='<<' THEN v2._vercomp < d1.depvercomp
+    WHEN d1.relop='<=' THEN v2._vercomp <= d1.depvercomp
+    WHEN d1.relop='=' THEN v2._vercomp = d1.depvercomp
+    WHEN d1.relop='>=' THEN v2._vercomp >= d1.depvercomp
+    WHEN d1.relop='>>' THEN v2._vercomp > d1.depvercomp END)
+  LEFT JOIN v_dpkg_dependencies d2
+  ON d2.package=v2.package AND d2.version=v2.version AND d2.repo=v2.repo
+  AND d2.relationship IN ('Breaks', 'Replaces', 'Conflicts')
+  AND d2.deppkg=f1.package AND (d2.deparch IS NULL OR d2.deparch=r1.architecture)
+  AND (CASE WHEN d2.relop IS NULL THEN TRUE
+    WHEN d2.relop='<<' THEN v1._vercomp < d2.depvercomp
+    WHEN d2.relop='<=' THEN v1._vercomp <= d2.depvercomp
+    WHEN d2.relop='=' THEN v1._vercomp = d2.depvercomp
+    WHEN d2.relop='>=' THEN v1._vercomp >= d2.depvercomp
+    WHEN d2.relop='>>' THEN v1._vercomp > d2.depvercomp END)
+  WHERE f1.ftype='reg' AND d1.package IS NULL AND d2.package IS NULL
+  ORDER BY package, version, repo, filename, r2.testing DESC
+) q2
 UNION ALL ----- 431 -----
 SELECT
   package, version, repo, 431::int errno, 0::smallint "level", filename, detail
@@ -140,10 +145,10 @@ FROM (
     AND (sp2.ver=sd.ver OR sp2.ver LIKE sd.ver || '.%')
     WHERE sd.depends=1 AND (sp.package IS NULL OR vp2.package IS NOT NULL)
     WINDOW w AS (PARTITION BY sd.package, sd.version, sd.repo, sd.name, sd.ver)
-  ) q1
+  ) q3
   WHERE matchcnt=0
   ORDER BY package, version, repo, filename, comparable_ver(ver_provide) DESC
-) q2
+) q4
 ;
 
 DELETE FROM pv_package_issues WHERE id IN (
