@@ -112,34 +112,39 @@ AND (CASE WHEN d2.relop IS NULL THEN TRUE
   WHEN d2.relop='>>' THEN v1._vercomp > d2.depvercomp END)
 WHERE f1.ftype='reg' AND d1.package IS NULL AND d2.package IS NULL
 UNION ALL ----- 431 -----
-SELECT DISTINCT ON (package, version, repo, filename)
+SELECT
   package, version, repo, 431::int errno, 0::smallint "level",
   (name || ver) filename, CASE WHEN package_lib IS NULL THEN NULL ELSE
     jsonb_object('{repo, package, version, sover_provide}',
     ARRAY[repo_lib, package_lib, version_lib, ver_provide]) END detail
 FROM (
-  SELECT
-    sd.package, sd.version, sd.repo, sd.name, rp.name repo_lib,
-    sp.package package_lib, sp.version version_lib, sd.ver, sp.ver ver_provide,
-    count(sp2.package) OVER w matchcnt
-  FROM pv_package_sodep sd
-  INNER JOIN v_packages_new vp USING (package, version, repo)
-  INNER JOIN pv_repos rd ON rd.name=sd.repo
-  INNER JOIN pv_repos rp ON rp.architecture=rd.architecture
-  AND rp.testing<=rd.testing AND rp.component IN (rd.component, 'main')
-  LEFT JOIN pv_package_sodep sp ON sp.repo=rp.name
-  AND sp.depends=0 AND sd.name=sp.name
-  LEFT JOIN v_packages_new vp2
-  ON vp2.package=sp.package AND vp2.version=sp.version AND vp2.repo=sp.repo
-  LEFT JOIN pv_package_sodep sp2
-  ON sp2.repo=sp.repo AND sp2.package=sp.package AND sp2.version=sp.version
-  AND sp.name=sp2.name AND sp.ver=sp2.ver AND sp2.depends=0
-  AND (sp2.ver=sd.ver OR sp2.ver LIKE sd.ver || '.%')
-  WHERE sd.depends=1 AND (sp.package IS NULL OR vp2.package IS NOT NULL)
-  WINDOW w AS (PARTITION BY sd.package, sd.version, sd.repo, sd.name, sd.ver)
-) q1
-WHERE matchcnt=0
-ORDER BY package, version, repo, filename, comparable_ver(ver_provide) DESC
+  SELECT DISTINCT ON (package, version, repo, filename)
+    package, version, repo, (name || ver) filename,
+    repo_lib, package_lib, version_lib, ver_provide
+  FROM (
+    SELECT
+      sd.package, sd.version, sd.repo, sd.name, rp.name repo_lib,
+      sp.package package_lib, sp.version version_lib, sd.ver, sp.ver ver_provide,
+      count(sp2.package) OVER w matchcnt
+    FROM pv_package_sodep sd
+    INNER JOIN v_packages_new vp USING (package, version, repo)
+    INNER JOIN pv_repos rd ON rd.name=sd.repo
+    INNER JOIN pv_repos rp ON rp.architecture=rd.architecture
+    AND rp.testing<=rd.testing AND rp.component IN (rd.component, 'main')
+    LEFT JOIN pv_package_sodep sp ON sp.repo=rp.name
+    AND sp.depends=0 AND sd.name=sp.name
+    LEFT JOIN v_packages_new vp2
+    ON vp2.package=sp.package AND vp2.version=sp.version AND vp2.repo=sp.repo
+    LEFT JOIN pv_package_sodep sp2
+    ON sp2.repo=sp.repo AND sp2.package=sp.package AND sp2.version=sp.version
+    AND sp.name=sp2.name AND sp.ver=sp2.ver AND sp2.depends=0
+    AND (sp2.ver=sd.ver OR sp2.ver LIKE sd.ver || '.%')
+    WHERE sd.depends=1 AND (sp.package IS NULL OR vp2.package IS NOT NULL)
+    WINDOW w AS (PARTITION BY sd.package, sd.version, sd.repo, sd.name, sd.ver)
+  ) q1
+  WHERE matchcnt=0
+  ORDER BY package, version, repo, filename, comparable_ver(ver_provide) DESC
+) q2
 ;
 
 DELETE FROM pv_package_issues WHERE id IN (
