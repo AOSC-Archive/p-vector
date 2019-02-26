@@ -40,8 +40,8 @@ WHERE package!='aosc-aaa' AND ftype='reg' AND (path='usr/local' OR
 UNION ALL ----- 322 -----
 SELECT f.package, f.version, f.repo, 322::int errno,
   (1-(perm&1))::smallint "level", '/' || path || '/' || name filename,
-  jsonb_build_object('size', size, 'perm', perm, 'uid', uid, 'gid', gid,
-    'uname', uname, 'gname', gname) detail
+  jsonb_build_object('size', f.size, 'perm', f.perm, 'uid', f.uid, 'gid', f.gid,
+    'uname', f.uname, 'gname', f.gname) detail
 FROM pv_package_files f
 INNER JOIN v_packages_new USING (package, version, repo)
 WHERE f.size=0 AND ftype='reg' AND perm & 1=1
@@ -51,16 +51,16 @@ AND name NOT LIKE '.%' AND name NOT LIKE '__init__.p%'
 UNION ALL ----- 323 -----
 SELECT f.package, f.version, f.repo, 323::int errno,
   -(perm&1)::smallint "level", '/' || path || '/' || name filename,
-  jsonb_build_object('size', size, 'perm', perm, 'uid', uid, 'gid', gid,
-    'uname', uname, 'gname', gname) detail
+  jsonb_build_object('size', f.size, 'perm', f.perm, 'uid', f.uid, 'gid', f.gid,
+    'uname', f.uname, 'gname', f.gname) detail
 FROM pv_package_files f
 INNER JOIN v_packages_new USING (package, version, repo)
 WHERE uid>999 OR gid>999
 UNION ALL ----- 324 -----
 SELECT f.package, f.version, f.repo, 324::int errno,
   0::smallint "level", '/' || path || '/' || name filename,
-  jsonb_build_object('size', size, 'perm', perm, 'uid', uid, 'gid', gid,
-    'uname', uname, 'gname', gname) detail
+  jsonb_build_object('size', f.size, 'perm', f.perm, 'uid', f.uid, 'gid', f.gid,
+    'uname', f.uname, 'gname', f.gname) detail
 FROM pv_package_files f
 INNER JOIN v_packages_new USING (package, version, repo)
 WHERE (path IN ('bin', 'sbin', 'usr/bin') AND perm&1=0 AND ftype='reg')
