@@ -163,7 +163,7 @@ WITH samerows AS (
   WHERE p.detail IS DISTINCT FROM t.detail
 )
 UPDATE pv_package_issues p
-SET p.mtime=now(), p."level"=t."level", p.detail=t.detail
+SET mtime=now(), "level"=t."level", detail=t.detail
 FROM t_package_issues t
 WHERE t.package=p.package AND t.version=p.version AND t.repo=p.repo
 AND t.errno=p.errno AND t.filename=p.filename
