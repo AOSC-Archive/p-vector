@@ -127,7 +127,6 @@ def init_db(db):
                 'ctime TIMESTAMP WITH TIME ZONE,'
                 'mtime TIMESTAMP WITH TIME ZONE,'
                 'atime TIMESTAMP WITH TIME ZONE,'
-                'description TEXT,'
                 'detail JSONB,'
                 'PRIMARY KEY (package, repo, errno, filename)'
                 ')')
