@@ -41,7 +41,7 @@ FROM (
 ) q3
 '''
 
-def init_db(db, dbtype='sqlite'):
+def init_db(db):
     cur = db.cursor()
     cur.execute('CREATE TABLE IF NOT EXISTS pv_repos ('
                 'name TEXT PRIMARY KEY,' # key: bsp-sunxi-armel/testing
