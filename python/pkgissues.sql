@@ -156,7 +156,7 @@ WITH samerows AS (
   FROM pv_package_issues p
   INNER JOIN t_package_issues t USING (
     package, version, repo, errno, "level", filename)
-  WHERE p.detail IS t.detail
+  WHERE p.detail IS DISTINCT FROM t.detail
 )
 UPDATE pv_package_issues p
 SET p.mtime=now(), p."level"=t."level", p.detail=t.detail
