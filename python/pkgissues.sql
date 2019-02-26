@@ -113,14 +113,13 @@ AND (CASE WHEN d2.relop IS NULL THEN TRUE
 WHERE f1.ftype='reg' AND d1.package IS NULL AND d2.package IS NULL
 UNION ALL ----- 431 -----
 SELECT
-  package, version, repo, 431::int errno, 0::smallint "level",
-  (name || ver) filename, CASE WHEN package_lib IS NULL THEN NULL ELSE
-    jsonb_object('{repo, package, version, sover_provide}',
-    ARRAY[repo_lib, package_lib, version_lib, ver_provide]) END detail
+  package, version, repo, 431::int errno, 0::smallint "level", filename, detail
 FROM (
   SELECT DISTINCT ON (package, version, repo, filename)
-    package, version, repo, (name || ver) filename,
-    repo_lib, package_lib, version_lib, ver_provide
+    package, version, repo, (name || ver) filename, ver_provide,
+    CASE WHEN package_lib IS NULL THEN NULL ELSE
+      jsonb_object('{repo, package, version, sover_provide}',
+      ARRAY[repo_lib, package_lib, version_lib, ver_provide]) END detail
   FROM (
     SELECT
       sd.package, sd.version, sd.repo, sd.name, rp.name repo_lib,
