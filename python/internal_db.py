@@ -126,9 +126,9 @@ def init_db(db):
                 'errno INTEGER,'
                 'level SMALLINT,'
                 'filename TEXT,'
-                'ctime TIMESTAMP WITH TIME ZONE,'
-                'mtime TIMESTAMP WITH TIME ZONE,'
-                'atime TIMESTAMP WITH TIME ZONE,'
+                'ctime TIMESTAMP WITH TIME ZONE DEFAULT (now()),'
+                'mtime TIMESTAMP WITH TIME ZONE DEFAULT (now()),'
+                'atime TIMESTAMP WITH TIME ZONE DEFAULT (now()),'
                 'detail JSONB,'
                 'UNIQUE (package, version, repo, errno, filename)'
                 ')')
