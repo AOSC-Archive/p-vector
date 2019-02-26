@@ -203,4 +203,16 @@ def drop_tables(db, ttype):
         for table in TABLES_PKGS:
             cur.execute("DROP TABLE IF EXISTS %s CASCADE" % table)
             logger_db.info(cur.query.decode('utf-8'))
+    for note in db.notices:
+        logger_db.info(note)
+    db.commit()
+
+def analyze_issues(db):
+    cur = db.cursor()
+    logger_db.info('Analyzing packaging issues...')
+    sqlfile = os.path.join(os.path.dirname(__file__), 'pkgissues.sql')
+    with open(sqlfile, 'r', encoding='utf-8') as f:
+        cur.execute(f.read())
+    logger_db.info(cur.statusmessage)
+    logger_db.info('Done.')
     db.commit()

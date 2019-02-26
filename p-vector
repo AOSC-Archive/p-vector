@@ -22,7 +22,7 @@ conf_common = None
 conf_branches = {}
 
 def usage():
-    print('Usage: %s CONF (scan|release|sync|reset)' % sys.argv[0], file=sys.stderr)
+    print('Usage: %s CONF (scan|release|sync|analyze|reset)' % sys.argv[0], file=sys.stderr)
     sys.exit(1)
 
 def main():
@@ -55,6 +55,8 @@ def main():
         module_release.generate(db, base_dir, conf_common, conf_branches)
     elif action == 'sync':
         module_sync.sync_db(db)
+    elif action == 'analyze':
+        internal_db.analyze_issues(db)
     elif action == 'reset':
         arg = action_args[0]
         assert input("Please confirm to reset tables for %s [YES]: " % arg) == 'YES'

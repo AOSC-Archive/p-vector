@@ -11,4 +11,5 @@ install(FILES
         module_check_elf.py
         vercomp.sql
         abbsdb.sql
+        pkgissues.sql
         DESTINATION ${LIBEXEC_PATH})
