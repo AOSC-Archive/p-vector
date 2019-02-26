@@ -120,6 +120,7 @@ def init_db(db):
                 ')')
     cur.execute('CREATE TABLE IF NOT EXISTS pv_package_issues ('
                 'package TEXT,'
+                'version TEXT,'
                 'repo TEXT,'
                 'errno INTEGER,'
                 'level SMALLINT,'
@@ -128,7 +129,7 @@ def init_db(db):
                 'mtime TIMESTAMP WITH TIME ZONE,'
                 'atime TIMESTAMP WITH TIME ZONE,'
                 'detail JSONB,'
-                'PRIMARY KEY (package, repo, errno, filename)'
+                'PRIMARY KEY (package, version, repo, errno, filename)'
                 ')')
     cur.execute('CREATE MATERIALIZED VIEW IF NOT EXISTS v_packages_new AS '
                 'SELECT DISTINCT ON (repo, package) package, version, repo, '
