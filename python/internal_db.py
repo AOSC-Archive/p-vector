@@ -169,8 +169,10 @@ def init_index(db, refresh=True):
                 ' ON pv_package_sodep (name, repo) WHERE depends=0')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_files_package'
                 ' ON pv_package_files (package, version, repo)')
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_files_path_name'
-                ' ON pv_package_files (path, name)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_files_path'
+                ' ON pv_package_files (path)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_files_name'
+                ' ON pv_package_files (name)')
     if refresh:
         cur.execute('REFRESH MATERIALIZED VIEW v_packages_new')
         cur.execute('REFRESH MATERIALIZED VIEW v_dpkg_dependencies')
