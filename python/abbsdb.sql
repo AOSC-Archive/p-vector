@@ -167,7 +167,7 @@ directory TEXT,
 package TEXT,
 err TEXT,
 PRIMARY KEY (rid, filename)
-)
+);
 CREATE TABLE IF NOT EXISTS repo_branches (
 tree SMALLINT,
 rid INTEGER,
