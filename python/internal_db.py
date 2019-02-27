@@ -178,6 +178,8 @@ def init_index(db, refresh=True):
         cur.execute('REFRESH MATERIALIZED VIEW v_dpkg_dependencies')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_packages_new_package'
                 ' ON v_packages_new (package, version, repo)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_v_packages_new_mtime'
+                ' ON v_packages_new (mtime)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_dpkg_dependencies_package'
                 ' ON v_dpkg_dependencies (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_dpkg_dependencies_dep'
