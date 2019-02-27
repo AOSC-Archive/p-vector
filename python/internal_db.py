@@ -148,6 +148,8 @@ def init_db(db):
                 ' ON pv_packages (repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_duplicate_package'
                 ' ON pv_package_duplicate (package, version, repo)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_issues_atime'
+                ' ON pv_package_issues (atime)')
     db.commit()
     try:
         cur.execute("SELECT 'comparable_dpkgver'::regproc")
