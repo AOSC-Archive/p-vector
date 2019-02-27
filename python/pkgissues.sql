@@ -1,34 +1,48 @@
 BEGIN;
 
+DELETE FROM pv_package_issues WHERE id IN (
+  SELECT i.id FROM pv_package_issues i
+  LEFT JOIN pv_packages p USING (package, version, repo)
+  WHERE p.package IS NULL
+);
+
+CREATE TEMP VIEW tv_pv_packages AS
+SELECT * FROM pv_packages WHERE mtime >= (
+  SELECT extract(epoch from max(atime)) FROM pv_package_issues
+);
+CREATE TEMP VIEW tv_packages_new AS
+SELECT * FROM v_packages_new WHERE mtime >= (
+  SELECT extract(epoch from max(atime)) FROM pv_package_issues
+);
+
 CREATE TEMP TABLE t_package_issues AS
 ----- 301 -----
 SELECT package, version, repo, 301::int errno, 0::smallint "level",
   filename, jsonb_build_object('size', size) detail
-FROM pv_packages WHERE debtime IS NULL
+FROM tv_pv_packages WHERE debtime IS NULL
 UNION ALL ----- 302 -----
 SELECT p.package, version, repo, 302::int errno, 0::smallint "level", filename,
   jsonb_build_object('size', p.size, 'medsize', q1.medsize) detail
-FROM pv_packages p
+FROM tv_pv_packages p
 INNER JOIN (
   SELECT package, percentile_cont(0.5) WITHIN GROUP (ORDER BY size) medsize
-  FROM pv_packages WHERE debtime IS NOT NULL GROUP BY package
+  FROM tv_pv_packages WHERE debtime IS NOT NULL GROUP BY package
 ) q1 ON p.package=q1.package AND p.size < q1.medsize/2
 WHERE p.debtime IS NOT NULL
 UNION ALL ----- 303 -----
 SELECT p.package, p.version, p.repo, 303::int errno, 0::smallint "level",
   p.filename, null::jsonb detail
-FROM pv_packages p
+FROM tv_pv_packages p
 INNER JOIN pv_repos r ON r.name=p.repo
 WHERE p.filename NOT LIKE array_to_string(ARRAY['pool', r.path,
   CASE WHEN p.package LIKE 'lib%' THEN substring(p.package from 1 for 4)
   ELSE substring(p.package from 1 for 1) END, '%'], '/')
 UNION ALL ----- 311 -----
-SELECT p.package, p.version, p.repo, 311::int errno, 0::smallint "level",
-  p.filename, jsonb_object(ARRAY['maintainer', p.maintainer]) detail
-FROM pv_packages p
-INNER JOIN v_packages_new n USING (package, version, repo)
-WHERE p.maintainer !~ '^.+ <.+@.+>$'
-OR p.maintainer='Null Packager <null@aosc.xyz>'
+SELECT package, version, repo, 311::int errno, 0::smallint "level",
+  filename, jsonb_object(ARRAY['maintainer', maintainer]) detail
+FROM tv_packages_new
+WHERE maintainer !~ '^.+ <.+@.+>$'
+OR maintainer='Null Packager <null@aosc.xyz>'
 UNION ALL ----- 321 -----
 SELECT f.package, f.version, f.repo, 321::int errno, 0::smallint "level",
   '/' || path || '/' || name filename,
@@ -43,7 +57,7 @@ SELECT f.package, f.version, f.repo, 322::int errno,
   jsonb_build_object('size', f.size, 'perm', f.perm, 'uid', f.uid, 'gid', f.gid,
     'uname', f.uname, 'gname', f.gname) detail
 FROM pv_package_files f
-INNER JOIN v_packages_new USING (package, version, repo)
+INNER JOIN tv_packages_new USING (package, version, repo)
 WHERE f.size=0 AND ftype='reg' AND perm & 1=1
 AND name NOT IN ('NEWS', 'ChangeLog', 'INSTALL', 'TODO', 'COPYING', 'AUTHORS',
   'README', 'README.md', 'README.txt', 'empty', 'placeholder', 'placeholder.txt')
@@ -54,7 +68,7 @@ SELECT f.package, f.version, f.repo, 323::int errno,
   jsonb_build_object('size', f.size, 'perm', f.perm, 'uid', f.uid, 'gid', f.gid,
     'uname', f.uname, 'gname', f.gname) detail
 FROM pv_package_files f
-INNER JOIN v_packages_new USING (package, version, repo)
+INNER JOIN tv_packages_new USING (package, version, repo)
 WHERE uid>999 OR gid>999
 UNION ALL ----- 324 -----
 SELECT f.package, f.version, f.repo, 324::int errno,
@@ -62,7 +76,7 @@ SELECT f.package, f.version, f.repo, 324::int errno,
   jsonb_build_object('size', f.size, 'perm', f.perm, 'uid', f.uid, 'gid', f.gid,
     'uname', f.uname, 'gname', f.gname) detail
 FROM pv_package_files f
-INNER JOIN v_packages_new USING (package, version, repo)
+INNER JOIN tv_packages_new USING (package, version, repo)
 WHERE (path IN ('bin', 'sbin', 'usr/bin') AND perm&1=0 AND ftype='reg')
 OR (ftype='dir' AND perm&64=0)
 UNION ALL ----- 412 -----
@@ -71,7 +85,7 @@ SELECT
   min(p.filename), jsonb_build_object('filenames',
     ARRAY[jsonb_agg(d.filename)]) detail
 FROM pv_package_duplicate d
-INNER JOIN pv_packages p USING (package, version, repo)
+INNER JOIN tv_pv_packages p USING (package, version, repo)
 GROUP BY d.package, d.version, d.repo
 UNION ALL ----- 421 -----
 SELECT
@@ -83,12 +97,12 @@ FROM (
     jsonb_object('{repo, package, version}',
       ARRAY[f2.repo, f2.package, f2.version]) detail
   FROM pv_package_files f1
-  INNER JOIN v_packages_new v1
+  INNER JOIN tv_packages_new v1
   ON v1.package=f1.package AND v1.version=f1.version AND v1.repo=f1.repo
   INNER JOIN pv_repos r1 ON r1.name=v1.repo
   INNER JOIN pv_repos r2 ON r2.architecture IN (r1.architecture, 'all')
   AND r2.testing<=r1.testing AND r2.component=r1.component
-  INNER JOIN v_packages_new v2
+  INNER JOIN tv_packages_new v2
   ON v2.repo=r2.name AND v2.package!=v1.package
   INNER JOIN pv_package_files f2
   ON v2.package=f2.package AND v2.version=f2.version AND v2.repo=f2.repo
@@ -131,13 +145,13 @@ FROM (
       sp.package package_lib, sp.version version_lib, sd.ver, sp.ver ver_provide,
       count(sp2.package) OVER w matchcnt
     FROM pv_package_sodep sd
-    INNER JOIN v_packages_new vp USING (package, version, repo)
+    INNER JOIN tv_packages_new vp USING (package, version, repo)
     INNER JOIN pv_repos rd ON rd.name=sd.repo
     INNER JOIN pv_repos rp ON rp.architecture=rd.architecture
     AND rp.testing<=rd.testing AND rp.component IN (rd.component, 'main')
     LEFT JOIN pv_package_sodep sp ON sp.repo=rp.name
     AND sp.depends=0 AND sd.name=sp.name
-    LEFT JOIN v_packages_new vp2
+    LEFT JOIN tv_packages_new vp2
     ON vp2.package=sp.package AND vp2.version=sp.version AND vp2.repo=sp.repo
     LEFT JOIN pv_package_sodep sp2
     ON sp2.repo=sp.repo AND sp2.package=sp.package AND sp2.version=sp.version
@@ -151,21 +165,18 @@ FROM (
 ) q4
 ;
 
-DELETE FROM pv_package_issues WHERE id IN (
-  SELECT p.id
-  FROM pv_package_issues p
-  LEFT JOIN t_package_issues t USING (package, version, repo, errno, filename)
-  WHERE t.package IS NULL
+UPDATE pv_package_issues SET atime=now()
+WHERE id IN (
+  SELECT i.id FROM pv_package_issues i
+  INNER JOIN tv_pv_packages p USING (package, version, repo)
 );
-
-UPDATE pv_package_issues SET atime=now();
 
 WITH samerows AS (
   SELECT p.id
   FROM pv_package_issues p
   INNER JOIN t_package_issues t USING (
     package, version, repo, errno, "level", filename)
-  WHERE p.detail IS DISTINCT FROM t.detail
+  WHERE p.detail IS NOT DISTINCT FROM t.detail
 )
 UPDATE pv_package_issues p
 SET mtime=now(), "level"=t."level", detail=t.detail
