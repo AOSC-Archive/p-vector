@@ -21,7 +21,8 @@ TABLES = (
     )),
 )
 SRCREPOS = ("aosc-os-core", "aosc-os-abbs", "aosc-os-arm-bsps")
-MARKS_TABLES = ("marks", "committers", "package_rel", "branches")
+MARKS_TABLES = (
+    "marks", "committers", "package_rel", "package_basherr", "branches")
 MARKS_DB_SFX = "-marks.db"
 
 logger_sync = logging.getLogger('SYNC')
