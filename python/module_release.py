@@ -7,6 +7,7 @@ import subprocess
 from pathlib import PosixPath, PurePath
 
 import deb822
+import internal_db
 from internal_pkgscan import sha256_file, size_sha256_fp
 
 logger_rel = logging.getLogger('REL')
@@ -16,6 +17,7 @@ def generate(db, base_dir: str, conf_common: dict, conf_branches: dict):
     pool_dir = base_dir + '/pool'
     dist_dir_real = base_dir + '/dists'
     dist_dir_old = base_dir + '/dists.old'
+    changed = False
     for i in PosixPath(pool_dir).iterdir():
         if not i.is_dir():
             continue
@@ -34,6 +36,7 @@ def generate(db, base_dir: str, conf_common: dict, conf_branches: dict):
                 shutil.copytree(realbranchdir, os.path.join(dist_dir, branch_name))
                 logger_rel.info('Skip generating Release for %s', branch_name)
                 continue
+        changed = True
         component_name_list = []
         for j in PosixPath(pool_dir).joinpath(branch_name).iterdir():
             if not j.is_dir():
@@ -53,6 +56,8 @@ def generate(db, base_dir: str, conf_common: dict, conf_branches: dict):
         os.rename(dist_dir_real, dist_dir_old)
     os.rename(dist_dir, dist_dir_real)
     shutil.rmtree(dist_dir_old, True)
+    if changed:
+        internal_db.analyze_issues(db)
 
 
 def gen_packages(db, dist_dir: str, branch_name: str, component_name: str):
