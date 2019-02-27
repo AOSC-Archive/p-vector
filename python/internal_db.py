@@ -161,8 +161,8 @@ def init_db(db):
 
 def init_index(db, refresh=True):
     cur = db.cursor()
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_packages_vercomp'
-                ' ON pv_packages (repo, package, _vercomp DESC)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_packages_mtime'
+                ' ON pv_packages (mtime)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_sodep_package'
                 ' ON pv_package_sodep (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_sodep_name'
