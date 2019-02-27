@@ -6,14 +6,13 @@ DELETE FROM pv_package_issues WHERE id IN (
   WHERE p.package IS NULL
 );
 
+CREATE TEMP VIEW tv_updated AS
+SELECT extract(epoch from max(atime)) t FROM pv_package_issues;
+
 CREATE TEMP VIEW tv_pv_packages AS
-SELECT * FROM pv_packages WHERE mtime >= (
-  SELECT extract(epoch from max(atime)) FROM pv_package_issues
-);
+SELECT * FROM pv_packages WHERE mtime >= (SELECT t FROM tv_updated);
 CREATE TEMP VIEW tv_packages_new AS
-SELECT * FROM v_packages_new WHERE mtime >= (
-  SELECT extract(epoch from max(atime)) FROM pv_package_issues
-);
+SELECT * FROM v_packages_new WHERE mtime >= (SELECT t FROM tv_updated);
 
 CREATE TEMP TABLE t_package_issues AS
 ----- 301 -----
@@ -97,12 +96,12 @@ FROM (
     jsonb_object('{repo, package, version}',
       ARRAY[f2.repo, f2.package, f2.version]) detail
   FROM pv_package_files f1
-  INNER JOIN tv_packages_new v1
+  INNER JOIN v_packages_new v1
   ON v1.package=f1.package AND v1.version=f1.version AND v1.repo=f1.repo
   INNER JOIN pv_repos r1 ON r1.name=v1.repo
   INNER JOIN pv_repos r2 ON r2.architecture IN (r1.architecture, 'all')
   AND r2.testing<=r1.testing AND r2.component=r1.component
-  INNER JOIN tv_packages_new v2
+  INNER JOIN v_packages_new v2
   ON v2.repo=r2.name AND v2.package!=v1.package
   INNER JOIN pv_package_files f2
   ON v2.package=f2.package AND v2.version=f2.version AND v2.repo=f2.repo
@@ -128,6 +127,8 @@ FROM (
     WHEN d2.relop='>=' THEN v1._vercomp >= d2.depvercomp
     WHEN d2.relop='>>' THEN v1._vercomp > d2.depvercomp END)
   WHERE f1.ftype='reg' AND d1.package IS NULL AND d2.package IS NULL
+  AND (v1.mtime >= (SELECT t FROM tv_updated)
+    OR v2.mtime >= (SELECT t FROM tv_updated))
   ORDER BY package, version, repo, filename, r2.testing DESC
 ) q2
 UNION ALL ----- 431 -----
@@ -151,7 +152,7 @@ FROM (
     AND rp.testing<=rd.testing AND rp.component IN (rd.component, 'main')
     LEFT JOIN pv_package_sodep sp ON sp.repo=rp.name
     AND sp.depends=0 AND sd.name=sp.name
-    LEFT JOIN tv_packages_new vp2
+    LEFT JOIN v_packages_new vp2
     ON vp2.package=sp.package AND vp2.version=sp.version AND vp2.repo=sp.repo
     LEFT JOIN pv_package_sodep sp2
     ON sp2.repo=sp.repo AND sp2.package=sp.package AND sp2.version=sp.version
