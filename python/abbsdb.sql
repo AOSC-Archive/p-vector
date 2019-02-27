@@ -63,6 +63,7 @@ laggingcnt INTEGER,
 missingcnt INTEGER
 -- FOREIGN KEY(repo) REFERENCES dpkg_repos(name)
 );
+CREATE INDEX IF NOT EXISTS idx_packages_directory ON packages (directory);
 CREATE INDEX IF NOT EXISTS idx_package_dependencies_rev
 ON package_dependencies (dependency);
 
@@ -156,6 +157,17 @@ epoch TEXT,
 message TEXT,
 PRIMARY KEY (tree, rid, package)
 );
+CREATE TABLE IF NOT EXISTS repo_package_basherr (
+tree SMALLINT,
+rid INTEGER,
+filename TEXT,
+category TEXT,
+section TEXT,
+directory TEXT,
+package TEXT,
+err TEXT,
+PRIMARY KEY (rid, filename)
+)
 CREATE TABLE IF NOT EXISTS repo_branches (
 tree SMALLINT,
 rid INTEGER,
