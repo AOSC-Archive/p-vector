@@ -7,7 +7,7 @@ DELETE FROM pv_package_issues WHERE id IN (
 );
 
 CREATE TEMP VIEW tv_updated AS
-SELECT extract(epoch from max(atime)) t FROM pv_package_issues;
+SELECT coalesce(extract(epoch from max(atime)), 0) t FROM pv_package_issues;
 
 CREATE TEMP VIEW tv_pv_packages AS
 SELECT * FROM pv_packages WHERE mtime >= (SELECT t FROM tv_updated);
