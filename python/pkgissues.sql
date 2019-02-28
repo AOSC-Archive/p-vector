@@ -16,7 +16,46 @@ CREATE TEMP VIEW tv_packages_new AS
 SELECT * FROM v_packages_new WHERE mtime >= (SELECT t FROM tv_updated);
 
 CREATE TEMP TABLE t_package_issues AS
------ 301 -----
+----- 101 -----
+SELECT r.package, ((CASE WHEN coalesce(r.epoch, '') = '' THEN ''
+    ELSE r.epoch || ':' END) || r.version ||
+   (CASE WHEN coalesce(r.release, '') IN ('', '0') THEN ''
+    ELSE '-' || r.release END)) "version", t.name repo,
+  101::int errno, 0::smallint "level", e.filename,
+  jsonb_build_object(
+    'err', e.err, 'branch', v.branch, 'githash', m.githash) detail
+FROM repo_package_basherr e
+INNER JOIN repo_package_rel r USING (tree, rid)
+INNER JOIN repo_marks m USING (tree, rid)
+INNER JOIN trees t ON t.tid=m.tree
+INNER JOIN package_versions v
+ON v.package=r.package AND v.githash=m.githash
+AND v.version IS NOT DISTINCT FROM r.version
+AND v.release IS NOT DISTINCT FROM r.release
+AND v.epoch IS NOT DISTINCT FROM r.epoch
+INNER JOIN packages p ON p.name=r.package
+AND p.category IS NOT DISTINCT FROM e.category
+AND p.section=e.section AND p.directory=e.directory
+WHERE e.package IS NULL
+UNION ALL ----- 102 -----
+SELECT r.package, ((CASE WHEN coalesce(r.epoch, '') = '' THEN ''
+    ELSE r.epoch || ':' END) || r.version ||
+   (CASE WHEN coalesce(r.release, '') IN ('', '0') THEN ''
+    ELSE '-' || r.release END)) "version", t.name repo,
+  102::int errno, 0::smallint "level", e.filename,
+  jsonb_build_object(
+    'err', e.err, 'branch', v.branch, 'githash', m.githash) detail
+FROM repo_package_basherr e
+INNER JOIN repo_package_rel r USING (tree, rid, package)
+INNER JOIN repo_marks m USING (tree, rid)
+INNER JOIN trees t ON t.tid=m.tree
+INNER JOIN package_versions v
+ON v.package=r.package AND v.githash=m.githash
+AND v.version IS NOT DISTINCT FROM r.version
+AND v.release IS NOT DISTINCT FROM r.release
+AND v.epoch IS NOT DISTINCT FROM r.epoch
+WHERE e.package IS NOT NULL
+UNION ALL ----- 301 -----
 SELECT package, version, repo, 301::int errno, 0::smallint "level",
   filename, jsonb_build_object('size', size) detail
 FROM tv_pv_packages WHERE debtime IS NULL
@@ -79,6 +118,27 @@ FROM pv_package_files f
 INNER JOIN tv_packages_new USING (package, version, repo)
 WHERE (path IN ('bin', 'sbin', 'usr/bin') AND perm&1=0 AND ftype='reg')
 OR (ftype='dir' AND perm&64=0)
+UNION ALL ----- 402 -----
+SELECT
+  p.name package, ((CASE WHEN coalesce(pv.epoch, '') = '' THEN ''
+    ELSE pv.epoch || ':' END) || pv.version ||
+   (CASE WHEN coalesce(pv.release, '') IN ('', '0') THEN ''
+    ELSE '-' || pv.release END)) "version", p.tree repo,
+  402::int errno, min((p.tree!=d.tree)::int::smallint) "level",
+  (p.tree || '/' || coalesce(p.category || '-' || p.section, p.section) ||
+    '/' || p.directory) filename,
+  jsonb_build_object('paths', jsonb_agg(d.tree || '/' || (CASE WHEN d.category=''
+    THEN d.section ELSE d.category || '-' || d.section END) || '/' ||
+    d.directory), 'githash', pv.githash) detail
+FROM packages p
+INNER JOIN package_duplicate d ON d.package=p.name
+AND NOT (d.tree=p.tree AND d.category=coalesce(p.category, '')
+  AND d.section=p.section AND d.directory=p.directory)
+INNER JOIN trees t ON t.name=p.tree
+INNER JOIN package_versions pv
+ON pv.package = p.name AND pv.branch = t.mainbranch
+GROUP BY p.name, pv.epoch, pv.version, pv.release, pv.githash,
+  p.tree, p.category, p.section, p.directory
 UNION ALL ----- 412 -----
 SELECT
   d.package, d.version, d.repo, 412::int errno, 0::smallint "level",
