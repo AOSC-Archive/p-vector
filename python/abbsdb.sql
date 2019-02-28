@@ -38,6 +38,7 @@ release TEXT,
 epoch TEXT,
 commit_time INTEGER,
 committer TEXT,
+githash TEXT,
 PRIMARY KEY (package, branch)
 );
 CREATE TABLE IF NOT EXISTS package_spec (
@@ -64,6 +65,8 @@ missingcnt INTEGER
 -- FOREIGN KEY(repo) REFERENCES dpkg_repos(name)
 );
 CREATE INDEX IF NOT EXISTS idx_packages_directory ON packages (directory);
+CREATE INDEX IF NOT EXISTS idx_package_versions_githash
+ON package_versions (githash);
 CREATE INDEX IF NOT EXISTS idx_package_dependencies_rev
 ON package_dependencies (dependency);
 
