@@ -56,8 +56,7 @@ def main():
     elif action == 'sync':
         module_sync.sync_db(db)
     elif action == 'analyze':
-        if len(action_args) == 1 and action_args[0] == 'full':
-            full = True
+        full = (len(action_args) == 1 and action_args[0] == 'full')
         internal_db.analyze_issues(db, full)
     elif action == 'reset':
         arg = action_args[0]
