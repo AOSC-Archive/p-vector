@@ -62,7 +62,7 @@ FROM tv_pv_packages WHERE debtime IS NULL
 UNION ALL ----- 302 -----
 SELECT p.package, version, repo, 302::int errno, 0::smallint "level", filename,
   jsonb_build_object('size', p.size, 'medsize', q1.medsize) detail
-FROM tv_pv_packages p
+FROM tv_packages_new p
 INNER JOIN (
   SELECT package, percentile_cont(0.5) WITHIN GROUP (ORDER BY size) medsize
   FROM tv_pv_packages WHERE debtime IS NOT NULL GROUP BY package
@@ -231,6 +231,8 @@ UPDATE pv_package_issues SET atime=now()
 WHERE id IN (
   SELECT i.id FROM pv_package_issues i
   INNER JOIN tv_pv_packages p USING (package, version, repo)
+  UNION ALL
+  SELECT i.id FROM pv_package_issues i WHERE errno < 200
 );
 
 WITH samerows AS (
