@@ -207,7 +207,7 @@ FROM (
     FROM pv_package_sodep sd
     INNER JOIN tv_packages_new vp USING (package, version, repo)
     INNER JOIN pv_repos rd ON rd.name=sd.repo
-    INNER JOIN pv_repos rp ON rp.architecture=rd.architecture
+    INNER JOIN pv_repos rp ON rd.architecture IN (rp.architecture, 'all')
     AND rp.testing<=rd.testing AND rp.component IN (rd.component, 'main')
     LEFT JOIN pv_package_sodep sp ON sp.repo=rp.name
     AND sp.depends=0 AND sd.name=sp.name
