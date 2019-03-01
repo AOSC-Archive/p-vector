@@ -8,10 +8,11 @@ url TEXT,
 mainbranch TEXT
 );
 CREATE TABLE IF NOT EXISTS tree_branches (
+name TEXT PRIMARY KEY,
 tree TEXT,
 branch TEXT,
 priority INTEGER,
-PRIMARY KEY (tree, branch)
+UNIQUE (tree, branch)
 );
 CREATE TABLE IF NOT EXISTS packages (
 name TEXT PRIMARY KEY,
