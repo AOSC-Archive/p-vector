@@ -213,9 +213,12 @@ def drop_tables(db, ttype):
         logger_db.info(note)
     db.commit()
 
-def analyze_issues(db):
+def analyze_issues(db, full=False):
     cur = db.cursor()
     logger_db.info('Analyzing packaging issues...')
+    if full:
+        cur.execute("UPDATE pv_package_issues SET atime='1970-01-01'")
+        logger_db.info(cur.statusmessage)
     sqlfile = os.path.join(os.path.dirname(__file__), 'pkgissues.sql')
     with open(sqlfile, 'r', encoding='utf-8') as f:
         cur.execute(f.read())

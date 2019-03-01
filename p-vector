@@ -56,7 +56,9 @@ def main():
     elif action == 'sync':
         module_sync.sync_db(db)
     elif action == 'analyze':
-        internal_db.analyze_issues(db)
+        if len(action_args) == 1 and action_args[0] == 'full':
+            full = True
+        internal_db.analyze_issues(db, full)
     elif action == 'reset':
         arg = action_args[0]
         assert input("Please confirm to reset tables for %s [YES]: " % arg) == 'YES'
