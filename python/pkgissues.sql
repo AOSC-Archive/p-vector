@@ -20,10 +20,9 @@ CREATE TEMP TABLE t_package_issues AS
 SELECT r.package, ((CASE WHEN coalesce(r.epoch, '') = '' THEN ''
     ELSE r.epoch || ':' END) || r.version ||
    (CASE WHEN coalesce(r.release, '') IN ('', '0') THEN ''
-    ELSE '-' || r.release END)) "version", t.name repo,
+    ELSE '-' || r.release END)) "version", t.name || '/' || v.branch repo,
   101::int errno, 0::smallint "level", e.filename,
-  jsonb_build_object(
-    'err', e.err, 'branch', v.branch, 'githash', m.githash) detail
+  jsonb_build_object('err', e.err, 'githash', m.githash) detail
 FROM repo_package_basherr e
 INNER JOIN repo_package_rel r USING (tree, rid)
 INNER JOIN repo_marks m USING (tree, rid)
@@ -41,10 +40,9 @@ UNION ALL ----- 102 -----
 SELECT r.package, ((CASE WHEN coalesce(r.epoch, '') = '' THEN ''
     ELSE r.epoch || ':' END) || r.version ||
    (CASE WHEN coalesce(r.release, '') IN ('', '0') THEN ''
-    ELSE '-' || r.release END)) "version", t.name repo,
+    ELSE '-' || r.release END)) "version", t.name || '/' || v.branch repo,
   102::int errno, 0::smallint "level", e.filename,
-  jsonb_build_object(
-    'err', e.err, 'branch', v.branch, 'githash', m.githash) detail
+  jsonb_build_object('err', e.err, 'githash', m.githash) detail
 FROM repo_package_basherr e
 INNER JOIN repo_package_rel r USING (tree, rid, package)
 INNER JOIN repo_marks m USING (tree, rid)
@@ -123,7 +121,7 @@ SELECT
   p.name package, ((CASE WHEN coalesce(pv.epoch, '') = '' THEN ''
     ELSE pv.epoch || ':' END) || pv.version ||
    (CASE WHEN coalesce(pv.release, '') IN ('', '0') THEN ''
-    ELSE '-' || pv.release END)) "version", p.tree repo,
+    ELSE '-' || pv.release END)) "version", p.tree || '/' || pv.branch repo,
   402::int errno, min((p.tree!=d.tree)::int::smallint) "level",
   (p.tree || '/' || coalesce(p.category || '-' || p.section, p.section) ||
     '/' || p.directory) filename,
@@ -137,7 +135,7 @@ AND NOT (d.tree=p.tree AND d.category=coalesce(p.category, '')
 INNER JOIN trees t ON t.name=p.tree
 INNER JOIN package_versions pv
 ON pv.package = p.name AND pv.branch = t.mainbranch
-GROUP BY p.name, pv.epoch, pv.version, pv.release, pv.githash,
+GROUP BY p.name, pv.epoch, pv.version, pv.release, pv.branch, pv.githash,
   p.tree, p.category, p.section, p.directory
 UNION ALL ----- 412 -----
 SELECT
