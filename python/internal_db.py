@@ -41,6 +41,32 @@ FROM (
 ) q3
 '''
 
+SQL_v_so_breaks = '''
+CREATE OR REPLACE VIEW v_so_breaks AS
+SELECT sp.package, sp.repo, sp.name soname, sp.ver sover,
+  sd.package dep_package, sd.repo dep_repo, sd.version dep_version
+FROM pv_package_sodep sp
+INNER JOIN v_packages_new vp USING (package, version, repo)
+INNER JOIN pv_repos rp ON rp.name=sp.repo
+INNER JOIN pv_repos rd ON rd.architecture IN (rp.architecture, 'all')
+AND rp.testing<=rd.testing AND rp.component IN (rd.component, 'main')
+INNER JOIN (
+  SELECT sd0.package, sd0.version, sd0.repo, sd0.name, sd0.ver
+  FROM pv_package_sodep sd0
+  INNER JOIN v_packages_new vp2
+  ON vp2.package=sd0.package AND vp2.version=sd0.version AND vp2.repo=sd0.repo
+  WHERE sd0.depends=1
+  UNION ALL
+  SELECT package, version, repo,
+    substring(filename from 1 for position('.so' in filename)+2) "name",
+    detail->>'sover_provide' ver
+  FROM pv_package_issues
+  WHERE errno=431 AND detail IS NOT NULL
+) sd ON sd.repo=rd.name AND sd.name=sp.name AND sd.package!=sp.package
+AND (sp.ver=sd.ver OR sp.ver LIKE sd.ver || '.%')
+WHERE sp.depends=0
+'''
+
 def init_db(db):
     cur = db.cursor()
     cur.execute('CREATE TABLE IF NOT EXISTS pv_repos ('
@@ -140,6 +166,7 @@ def init_db(db):
                 'WHERE debtime IS NOT NULL '
                 'ORDER BY repo, package, _vercomp DESC')
     cur.execute(SQL_v_dpkg_dependencies)
+    cur.execute(SQL_v_so_breaks)
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_path'
                 ' ON pv_repos (path, architecture)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_architecture'
