@@ -42,7 +42,7 @@ FROM (
 '''
 
 SQL_v_so_breaks = '''
-CREATE OR REPLACE VIEW v_so_breaks AS
+CREATE MATERIALIZED VIEW IF NOT EXISTS v_so_breaks AS
 SELECT sp.package, sp.repo, sp.name soname, sp.ver sover,
   sd.package dep_package, sd.repo dep_repo, sd.version dep_version
 FROM pv_package_sodep sp
@@ -212,6 +212,7 @@ def init_index(db, refresh=True):
     if refresh:
         cur.execute('REFRESH MATERIALIZED VIEW v_packages_new')
         cur.execute('REFRESH MATERIALIZED VIEW v_dpkg_dependencies')
+        cur.execute('REFRESH MATERIALIZED VIEW v_so_breaks')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_packages_new_package'
                 ' ON v_packages_new (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_packages_new_mtime'
@@ -220,6 +221,8 @@ def init_index(db, refresh=True):
                 ' ON v_dpkg_dependencies (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_dpkg_dependencies_dep'
                 ' ON v_dpkg_dependencies (relationship, deppkg, depvercomp)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_v_so_breaks_package'
+                ' ON v_so_breaks (package)')
     db.commit()
     cur.close()
 
