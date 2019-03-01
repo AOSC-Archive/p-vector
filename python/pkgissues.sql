@@ -225,6 +225,13 @@ FROM (
 ) q4
 ;
 
+DELETE FROM pv_package_issues WHERE id IN (
+  SELECT p.id
+  FROM pv_package_issues p
+  LEFT JOIN t_package_issues t USING (package, version, repo, errno, filename)
+  WHERE t.package IS NULL
+);
+
 UPDATE pv_package_issues SET atime=now()
 WHERE id IN (
   SELECT i.id FROM pv_package_issues i
