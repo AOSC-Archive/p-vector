@@ -50,20 +50,25 @@ INNER JOIN v_packages_new vp USING (package, version, repo)
 INNER JOIN pv_repos rp ON rp.name=sp.repo
 INNER JOIN pv_repos rd ON rd.architecture IN (rp.architecture, 'all')
 AND rp.testing<=rd.testing AND rp.component IN (rd.component, 'main')
-INNER JOIN (
-  SELECT sd0.package, sd0.version, sd0.repo, sd0.name, sd0.ver
-  FROM pv_package_sodep sd0
-  INNER JOIN v_packages_new vp2
-  ON vp2.package=sd0.package AND vp2.version=sd0.version AND vp2.repo=sd0.repo
-  WHERE sd0.depends=1
-  UNION ALL
-  SELECT package, version, repo,
-    substring(filename from 1 for position('.so' in filename)+2) "name",
-    detail->>'sover_provide' ver
-  FROM pv_package_issues
-  WHERE errno=431 AND detail IS NOT NULL
-) sd ON sd.repo=rd.name AND sd.name=sp.name AND sd.package!=sp.package
+INNER JOIN pv_package_sodep sd ON sd.depends=1
+AND sd.repo=rd.name AND sd.name=sp.name AND sd.package!=sp.package
 AND (sp.ver=sd.ver OR sp.ver LIKE sd.ver || '.%')
+INNER JOIN v_packages_new vp2
+ON vp2.package=sd.package AND vp2.version=sd.version AND vp2.repo=sd.repo
+WHERE sp.depends=0
+UNION ALL
+SELECT sp.package, sp.repo, sp.name soname, sp.ver sover,
+  pi.package dep_package, pi.repo dep_repo, pi.version dep_version
+FROM pv_package_sodep sp
+INNER JOIN v_packages_new vp USING (package, version, repo)
+INNER JOIN pv_repos rp ON rp.name=sp.repo
+INNER JOIN pv_repos rd ON rd.architecture IN (rp.architecture, 'all')
+AND rp.testing<=rd.testing AND rp.component IN (rd.component, 'main')
+INNER JOIN pv_package_issues pi
+ON pi.repo=rd.name AND pi.package!=sp.package
+AND substring(pi.filename from 1 for position('.so' in pi.filename)+2)=sp.name
+AND (sp.ver || '.') LIKE (detail->>'sover_provide') || '.%'
+AND pi.errno=431 AND pi.detail IS NOT NULL
 WHERE sp.depends=0
 '''
 
