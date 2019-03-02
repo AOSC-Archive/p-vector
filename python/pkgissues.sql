@@ -225,20 +225,22 @@ FROM (
 ) q4
 ;
 
+CREATE TEMP TABLE t_touched AS
+SELECT i.id FROM pv_package_issues i
+INNER JOIN tv_pv_packages p USING (package, version, repo)
+UNION ALL
+SELECT i.id FROM pv_package_issues i WHERE errno < 200;
+
 DELETE FROM pv_package_issues WHERE id IN (
   SELECT p.id
   FROM pv_package_issues p
+  INNER JOIN t_touched USING (id)
   LEFT JOIN t_package_issues t USING (package, version, repo, errno, filename)
   WHERE t.package IS NULL
 );
 
 UPDATE pv_package_issues SET atime=now()
-WHERE id IN (
-  SELECT i.id FROM pv_package_issues i
-  INNER JOIN tv_pv_packages p USING (package, version, repo)
-  UNION ALL
-  SELECT i.id FROM pv_package_issues i WHERE errno < 200
-);
+WHERE id IN (SELECT id FROM t_touched);
 
 WITH samerows AS (
   SELECT p.id
@@ -260,6 +262,7 @@ SELECT t.* FROM t_package_issues t
 LEFT JOIN pv_package_issues p USING (package, version, repo, errno, filename)
 WHERE p.package IS NULL;
 
+DROP TABLE t_touched;
 DROP TABLE t_package_issues;
 
 COMMIT;
