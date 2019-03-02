@@ -75,11 +75,20 @@ WHERE p.filename NOT LIKE array_to_string(ARRAY['pool', r.path,
   CASE WHEN p.package LIKE 'lib%' THEN substring(p.package from 1 for 4)
   ELSE substring(p.package from 1 for 1) END, '%'], '/')
 UNION ALL ----- 311 -----
-SELECT package, version, repo, 311::int errno, 0::smallint "level",
-  filename, jsonb_object(ARRAY['maintainer', maintainer]) detail
-FROM tv_packages_new
-WHERE maintainer !~ '^.+ <.+@.+>$'
-OR maintainer='Null Packager <null@aosc.xyz>'
+SELECT p.package, p.version, p.repo, 311::int errno, 0::smallint "level",
+  p.filename, jsonb_build_object('maintainer', p.maintainer,
+    'committer', pv.committer) detail
+FROM tv_packages_new p
+INNER JOIN pv_repos r ON r.name=p.repo
+LEFT JOIN packages s ON s.name=p.package
+LEFT JOIN tree_branches b ON b.tree=s.tree AND b.priority=r.testing
+LEFT JOIN package_versions pv ON p.package=pv.package AND pv.branch=b.branch
+AND p.version=((CASE WHEN coalesce(pv.epoch, '') = '' THEN ''
+  ELSE pv.epoch || ':' END) || pv.version ||
+  (CASE WHEN coalesce(pv.release, '') IN ('', '0') THEN ''
+  ELSE '-' || pv.release END))
+WHERE p.maintainer !~ '^.+ <.+@.+>$'
+OR p.maintainer='Null Packager <null@aosc.xyz>'
 UNION ALL ----- 321 -----
 SELECT f.package, f.version, f.repo, 321::int errno, 0::smallint "level",
   '/' || path || '/' || name filename,
