@@ -182,6 +182,8 @@ def init_db(db):
                 ' ON pv_package_duplicate (package, version, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_issues_errno'
                 ' ON pv_package_issues (errno)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_issues_mtime'
+                ' ON pv_package_issues USING brin (mtime)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_issues_atime'
                 ' ON pv_package_issues (atime)')
     db.commit()
