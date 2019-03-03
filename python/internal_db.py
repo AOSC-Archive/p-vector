@@ -170,8 +170,6 @@ def init_db(db):
                 'FROM pv_packages '
                 'WHERE debtime IS NOT NULL '
                 'ORDER BY repo, package, _vercomp DESC')
-    cur.execute(SQL_v_dpkg_dependencies)
-    cur.execute(SQL_v_so_breaks)
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_path'
                 ' ON pv_repos (path, architecture)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_architecture'
@@ -199,6 +197,8 @@ def init_db(db):
 
 def init_index(db, refresh=True):
     cur = db.cursor()
+    cur.execute(SQL_v_dpkg_dependencies)
+    cur.execute(SQL_v_so_breaks)
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_packages_mtime'
                 ' ON pv_packages (mtime)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_sodep_package'
