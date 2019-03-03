@@ -34,3 +34,13 @@ RETURNS text AS $$
     FROM (SELECT position(':' in ver) epos, ver v) q1
   ) q1
 $$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE COST 200;
+
+CREATE OR REPLACE FUNCTION public.compare_dpkgrel (a text, op text, b text)
+RETURNS bool AS $$
+  SELECT CASE WHEN op IS NULL THEN TRUE
+    WHEN op='<<' THEN a < b
+    WHEN op='<=' THEN a <= b
+    WHEN op='=' THEN a = b
+    WHEN op='>=' THEN a >= b
+    WHEN op='>>' THEN a > b ELSE NULL END
+$$ LANGUAGE SQL IMMUTABLE PARALLEL SAFE COST 200;
