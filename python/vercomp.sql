@@ -34,5 +34,3 @@ RETURNS text AS $$
     FROM (SELECT position(':' in ver) epos, ver v) q1
   ) q1
 $$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE COST 200;
-
--- test: 'libc6 (>= 2.3.6-6), libdb4.4, libgnutls13 (>= 1.4.0-0), libidn11 (>= 0.5.18), libncursesw5 (>= 5.4-5), libsasl2 (>= 2.1.19.dfsg1), exim4 | mail-transport-agent, perl:any, python:native'

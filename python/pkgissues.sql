@@ -241,6 +241,23 @@ FROM (
   WHERE matchcnt=0
   ORDER BY package, version, repo, filename, comparable_ver(ver_provide) DESC
 ) q4
+UNION ALL ----- 432 -----
+SELECT s.dep_package package, s.dep_version "version", s.dep_repo repo,
+  432::int errno, 0::smallint "level", s.soname || s.sover filename,
+  jsonb_object('{dep_package, dep_version, dep_repo}',
+    ARRAY[s.package, p.version, s.repo]) detail
+FROM v_so_breaks s
+INNER JOIN v_packages_new p USING (package, repo)
+LEFT JOIN v_dpkg_dependencies d ON d.package=s.dep_package AND d.repo=s.repo
+AND d.version=p.version AND d.deppkg=s.package AND d.relationship='Depends'
+AND (d.deparch IS NULL OR d.deparch=p.architecture)
+AND (CASE WHEN d.relop IS NULL THEN TRUE
+  WHEN d.relop='<<' THEN p._vercomp < d.depvercomp
+  WHEN d.relop='<=' THEN p._vercomp <= d.depvercomp
+  WHEN d.relop='=' THEN p._vercomp = d.depvercomp
+  WHEN d.relop='>=' THEN p._vercomp >= d.depvercomp
+  WHEN d.relop='>>' THEN p._vercomp > d.depvercomp END)
+WHERE d.package IS NULL
 ;
 
 CREATE TEMP TABLE t_touched AS
