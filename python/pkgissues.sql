@@ -53,6 +53,15 @@ AND v.version IS NOT DISTINCT FROM r.version
 AND v.release IS NOT DISTINCT FROM r.release
 AND v.epoch IS NOT DISTINCT FROM r.epoch
 WHERE e.package IS NOT NULL
+UNION ALL ----- 103 -----
+SELECT p.name package, p.full_version "version", b.name repo,
+  103::int errno, 0::smallint "level",
+  coalesce(p.category || '-' || p.section, p.section) ||
+    '/' || p.directory || '/spec' filename,
+  null::jsonb detail
+FROM v_packages p
+INNER JOIN tree_branches b ON b.tree=p.tree
+WHERE p.name !~ '^[a-z0-9][a-z0-9+.-]*$'  -- except "r"
 UNION ALL ----- 301 -----
 SELECT package, version, repo, 301::int errno, 0::smallint "level",
   filename, jsonb_build_object('size', size) detail
