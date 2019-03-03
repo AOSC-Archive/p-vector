@@ -254,6 +254,8 @@ FROM (
         ARRAY[s.package, p.version, s.repo]) detail
     FROM v_so_breaks s
     INNER JOIN v_packages_new p USING (package, repo)
+    INNER JOIN tv_packages_new dp
+    ON dp.package=s.dep_package AND dp.repo=s.dep_repo
     INNER JOIN pv_repos r ON r.name=s.repo
     INNER JOIN packages k1 ON k1.name=s.dep_package
     INNER JOIN packages k2 ON k2.name=s.package
