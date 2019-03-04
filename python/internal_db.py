@@ -226,7 +226,7 @@ def init_index(db, refresh=True):
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_so_breaks_package'
                 ' ON v_so_breaks (package, repo)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_so_breaks_dep_package'
-                ' ON v_so_breaks (dep_package, dep_repo)')
+                ' ON v_so_breaks (dep_package, dep_repo, dep_version)')
     db.commit()
     cur.close()
 
