@@ -187,22 +187,12 @@ FROM (
   ON d1.package=f1.package AND d1.version=f1.version AND d1.repo=f1.repo
   AND d1.relationship IN ('Breaks', 'Replaces', 'Conflicts')
   AND d1.deppkg=v2.package AND (d1.deparch IS NULL OR d1.deparch=r2.architecture)
-  AND (CASE WHEN d1.relop IS NULL THEN TRUE
-    WHEN d1.relop='<<' THEN v2._vercomp < d1.depvercomp
-    WHEN d1.relop='<=' THEN v2._vercomp <= d1.depvercomp
-    WHEN d1.relop='=' THEN v2._vercomp = d1.depvercomp
-    WHEN d1.relop='>=' THEN v2._vercomp >= d1.depvercomp
-    WHEN d1.relop='>>' THEN v2._vercomp > d1.depvercomp END)
+  AND compare_dpkgrel(v2._vercomp, d1.relop, d1.depvercomp)
   LEFT JOIN v_dpkg_dependencies d2
   ON d2.package=v2.package AND d2.version=v2.version AND d2.repo=v2.repo
   AND d2.relationship IN ('Breaks', 'Replaces', 'Conflicts')
   AND d2.deppkg=f1.package AND (d2.deparch IS NULL OR d2.deparch=r1.architecture)
-  AND (CASE WHEN d2.relop IS NULL THEN TRUE
-    WHEN d2.relop='<<' THEN v1._vercomp < d2.depvercomp
-    WHEN d2.relop='<=' THEN v1._vercomp <= d2.depvercomp
-    WHEN d2.relop='=' THEN v1._vercomp = d2.depvercomp
-    WHEN d2.relop='>=' THEN v1._vercomp >= d2.depvercomp
-    WHEN d2.relop='>>' THEN v1._vercomp > d2.depvercomp END)
+  AND compare_dpkgrel(v1._vercomp, d2.relop, d2.depvercomp)
   WHERE f1.ftype='reg' AND d1.package IS NULL AND d2.package IS NULL
   AND (v1.mtime >= (SELECT t FROM tv_updated)
     OR v2.mtime >= (SELECT t FROM tv_updated))
@@ -248,8 +238,34 @@ FROM (
   SELECT DISTINCT ON (package, "version", repo, filename)
     package, "version", repo, filename, detail
   FROM (
+    WITH RECURSIVE alldep AS (
+      SELECT d.package, d.dependency, (s.package IS NOT NULL) sodep
+      FROM package_dependencies d
+      INNER JOIN v_packages v2 ON v2.name=d.dependency
+      AND compare_dpkgrel(v2.full_version,
+        CASE WHEN d.relop='==' THEN '=' ELSE d.relop END, d.version)
+      LEFT JOIN (
+        SELECT DISTINCT package, dep_package FROM v_so_breaks
+      ) s ON s.package=d.dependency AND s.dep_package=d.package
+      WHERE d.relationship='PKGDEP' AND d.package!=d.dependency
+      AND d.package IN (SELECT dep_package FROM v_so_breaks)
+      UNION
+      SELECT a.package, d.dependency, (s.package IS NOT NULL) sodep
+      FROM alldep a
+      INNER JOIN package_dependencies d ON d.package=a.dependency
+      AND d.relationship='PKGDEP'
+      INNER JOIN v_packages v2 ON v2.name=d.dependency
+      AND compare_dpkgrel(v2.full_version,
+        CASE WHEN d.relop='==' THEN '=' ELSE d.relop END, d.version)
+      LEFT JOIN (
+        SELECT DISTINCT package, dep_package FROM v_so_breaks
+      ) s ON s.package=d.dependency AND s.dep_package=a.package
+      WHERE a.sodep=FALSE
+    )
     SELECT s.dep_package package, s.dep_version "version", s.dep_repo repo,
-      s.soname || s.sover filename, r.testing,
+      sd.name || sd.ver filename, r.testing,
+      count(d.package) OVER w matchcnt,
+      bool_and(k2.tree!='aosc-os-core') OVER w depnotincore,
       jsonb_object('{dep_package, dep_version, dep_repo}',
         ARRAY[s.package, p.version, s.repo]) detail
     FROM v_so_breaks s
@@ -259,18 +275,16 @@ FROM (
     INNER JOIN pv_repos r ON r.name=s.repo
     INNER JOIN packages k1 ON k1.name=s.dep_package
     INNER JOIN packages k2 ON k2.name=s.package
-    LEFT JOIN v_dpkg_dependencies d ON d.package=s.dep_package AND d.repo=s.repo
-    AND d.version=p.version AND d.deppkg=s.package AND d.relationship='Depends'
-    AND (d.deparch IS NULL OR d.deparch=p.architecture)
-    AND (CASE WHEN d.relop IS NULL THEN TRUE
-      WHEN d.relop='<<' THEN p._vercomp < d.depvercomp
-      WHEN d.relop='<=' THEN p._vercomp <= d.depvercomp
-      WHEN d.relop='=' THEN p._vercomp = d.depvercomp
-      WHEN d.relop='>=' THEN p._vercomp >= d.depvercomp
-      WHEN d.relop='>>' THEN p._vercomp > d.depvercomp END)
-    WHERE d.package IS NULL
-    AND (k2.tree!='aosc-os-core' OR k1.tree='aosc-os-core')
+    INNER JOIN pv_package_sodep sd ON sd.package=s.dep_package
+    AND sd."version"=s.dep_version AND sd.repo=s.dep_repo AND sd.depends=1
+    AND sd.name=s.soname AND (s.sover=sd.ver OR s.sover LIKE sd.ver || '.%')
+    LEFT JOIN alldep d ON d.package=s.dep_package
+    AND d.dependency=s.package AND d.sodep=TRUE
+    WHERE k1.tree!='aosc-os-core'
+    WINDOW w AS (PARTITION BY
+      s.dep_package, s.dep_version, s.dep_repo, sd.name, sd.ver)
   ) q5
+  WHERE matchcnt=0 AND depnotincore
   ORDER BY package, "version", repo, filename, -testing
 ) q6
 ;
