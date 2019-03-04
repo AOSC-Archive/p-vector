@@ -216,7 +216,7 @@ def init_index(db, refresh=True):
         cur.execute('REFRESH MATERIALIZED VIEW v_dpkg_dependencies')
         cur.execute('REFRESH MATERIALIZED VIEW v_so_breaks')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_packages_new_package'
-                ' ON v_packages_new (package, version, repo)')
+                ' ON v_packages_new (package, repo, version)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_packages_new_mtime'
                 ' ON v_packages_new (mtime)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_dpkg_dependencies_package'
@@ -224,7 +224,9 @@ def init_index(db, refresh=True):
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_dpkg_dependencies_dep'
                 ' ON v_dpkg_dependencies (relationship, deppkg, depvercomp)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_so_breaks_package'
-                ' ON v_so_breaks (package)')
+                ' ON v_so_breaks (package, repo)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_v_so_breaks_dep_package'
+                ' ON v_so_breaks (dep_package, dep_repo)')
     db.commit()
     cur.close()
 
