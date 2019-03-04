@@ -52,6 +52,7 @@ PRIMARY KEY (package, key)
 CREATE TABLE IF NOT EXISTS package_dependencies (
 package TEXT,
 dependency TEXT,
+relop TEXT,
 version TEXT,
 relationship TEXT,
 PRIMARY KEY (package, dependency, relationship)
