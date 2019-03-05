@@ -22,7 +22,7 @@ SELECT r.package, ((CASE WHEN coalesce(r.epoch, '') = '' THEN ''
    (CASE WHEN coalesce(r.release, '') IN ('', '0') THEN ''
     ELSE '-' || r.release END)) "version", t.name || '/' || v.branch repo,
   101::int errno, 0::smallint "level", e.filename,
-  jsonb_build_object('err', e.err, 'githash', m.githash) detail
+  jsonb_build_object('err', e.err, 'tree', t.name, 'githash', m.githash) detail
 FROM repo_package_basherr e
 INNER JOIN repo_package_rel r USING (tree, rid)
 INNER JOIN repo_marks m USING (tree, rid)
@@ -42,7 +42,7 @@ SELECT r.package, ((CASE WHEN coalesce(r.epoch, '') = '' THEN ''
    (CASE WHEN coalesce(r.release, '') IN ('', '0') THEN ''
     ELSE '-' || r.release END)) "version", t.name || '/' || v.branch repo,
   102::int errno, 0::smallint "level", e.filename,
-  jsonb_build_object('err', e.err, 'githash', m.githash) detail
+  jsonb_build_object('err', e.err, 'tree', t.name, 'githash', m.githash) detail
 FROM repo_package_basherr e
 INNER JOIN repo_package_rel r USING (tree, rid, package)
 INNER JOIN repo_marks m USING (tree, rid)
