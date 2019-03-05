@@ -92,11 +92,11 @@ FROM (
     INNER JOIN pv_repos r ON r.name=p.repo
   ) q1
 ) q2
-WHERE p.filename != goodfilename
+WHERE filename != goodfilename
 UNION ALL ----- 311 -----
 SELECT p.package, p.version, p.repo, 311::int errno, 0::smallint "level",
   p.filename, jsonb_build_object('maintainer', p.maintainer,
-    'committer', pv.committer) detail
+    'committer', pv.committer, 'githash', pv.githash) detail
 FROM tv_packages_new p
 INNER JOIN pv_repos r ON r.name=p.repo
 LEFT JOIN packages s ON s.name=p.package
