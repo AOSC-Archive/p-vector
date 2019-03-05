@@ -77,7 +77,7 @@ INNER JOIN (
 WHERE p.debtime IS NOT NULL
 UNION ALL ----- 303 -----
 SELECT package, version, repo, 303::int errno, 0::smallint "level", filename,
-  jsonb_build_object('suggestion', goodfilename) 
+  jsonb_build_object('suggestion', goodfilename) detail
 FROM (
   SELECT package, version, repo, filename, (ppart || version_spl[2] ||
     coalesce(version_spl[3], '-0') || '_' || (CASE WHEN architecture='all'
