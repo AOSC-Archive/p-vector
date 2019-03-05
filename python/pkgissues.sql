@@ -263,7 +263,7 @@ FROM (
       WHERE a.sodep=FALSE
     )
     SELECT s.dep_package package, s.dep_version "version", s.dep_repo repo,
-      sd.name || sd.ver filename, r.testing,
+      s.soname || s.sodepver filename, r.testing,
       count(d.package) OVER w matchcnt,
       bool_and(k2.tree!='aosc-os-core') OVER w depnotincore,
       jsonb_object('{dep_package, dep_version, dep_repo}',
@@ -275,14 +275,11 @@ FROM (
     INNER JOIN pv_repos r ON r.name=s.repo
     INNER JOIN packages k1 ON k1.name=s.dep_package
     INNER JOIN packages k2 ON k2.name=s.package
-    INNER JOIN pv_package_sodep sd ON sd.package=s.dep_package
-    AND sd."version"=s.dep_version AND sd.repo=s.dep_repo AND sd.depends=1
-    AND sd.name=s.soname AND (s.sover=sd.ver OR s.sover LIKE sd.ver || '.%')
     LEFT JOIN alldep d ON d.package=s.dep_package
     AND d.dependency=s.package AND d.sodep=TRUE
     WHERE k1.tree!='aosc-os-core'
     WINDOW w AS (PARTITION BY
-      s.dep_package, s.dep_version, s.dep_repo, sd.name, sd.ver)
+      s.dep_package, s.dep_version, s.dep_repo, s.soname, s.sodepver)
   ) q5
   WHERE matchcnt=0 AND depnotincore
   ORDER BY package, "version", repo, filename, -testing
