@@ -76,13 +76,23 @@ INNER JOIN (
 ) q1 ON p.package=q1.package AND p.size < q1.medsize/2
 WHERE p.debtime IS NOT NULL
 UNION ALL ----- 303 -----
-SELECT p.package, p.version, p.repo, 303::int errno, 0::smallint "level",
-  p.filename, null::jsonb detail
-FROM tv_pv_packages p
-INNER JOIN pv_repos r ON r.name=p.repo
-WHERE p.filename NOT LIKE array_to_string(ARRAY['pool', r.path,
-  CASE WHEN p.package LIKE 'lib%' THEN substring(p.package from 1 for 4)
-  ELSE substring(p.package from 1 for 1) END, '%'], '/')
+SELECT package, version, repo, 303::int errno, 0::smallint "level", filename,
+  jsonb_build_object('suggestion', goodfilename) 
+FROM (
+  SELECT package, version, repo, filename, (ppart || version_spl[2] ||
+    coalesce(version_spl[3], '-0') || '_' || (CASE WHEN architecture='all'
+    THEN 'noarch' ELSE architecture END) || '.deb') goodfilename
+  FROM (
+    SELECT p.package, p.version, p.repo, p.filename, p.architecture,
+      regexp_match(p.version, '^([0-9]+:)?([A-Za-z0-9.+~-]+?)(-[A-Za-z0-9.+~]+)?$')
+        AS version_spl, array_to_string(ARRAY['pool', r.path,
+        CASE WHEN p.package LIKE 'lib%' THEN substring(p.package from 1 for 4)
+        ELSE substring(p.package from 1 for 1) END, p.package || '_'], '/') ppart
+    FROM tv_pv_packages p
+    INNER JOIN pv_repos r ON r.name=p.repo
+  ) q1
+) q2
+WHERE p.filename != goodfilename
 UNION ALL ----- 311 -----
 SELECT p.package, p.version, p.repo, 311::int errno, 0::smallint "level",
   p.filename, jsonb_build_object('maintainer', p.maintainer,
