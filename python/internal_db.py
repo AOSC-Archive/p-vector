@@ -43,7 +43,7 @@ FROM (
 
 SQL_v_so_breaks = '''
 CREATE MATERIALIZED VIEW IF NOT EXISTS v_so_breaks AS
-SELECT sp.package, sp.repo, sp.name soname, sp.ver sover,
+SELECT sp.package, sp.repo, sp.name soname, sp.ver sover, sd.ver sodepver,
   sd.package dep_package, sd.repo dep_repo, sd.version dep_version
 FROM pv_package_sodep sp
 INNER JOIN v_packages_new vp USING (package, version, repo)
@@ -58,6 +58,7 @@ ON vp2.package=sd.package AND vp2.version=sd.version AND vp2.repo=sd.repo
 WHERE sp.depends=0
 UNION ALL
 SELECT sp.package, sp.repo, sp.name soname, sp.ver sover,
+  substring(pi.filename from position('.so' in pi.filename)+3) sodepver,
   pi.package dep_package, pi.repo dep_repo, pi.version dep_version
 FROM pv_package_sodep sp
 INNER JOIN v_packages_new vp USING (package, version, repo)
