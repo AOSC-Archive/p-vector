@@ -112,7 +112,7 @@ UNION ALL ----- 321 -----
 SELECT f.package, f.version, f.repo, 321::int errno, 0::smallint "level",
   (CASE WHEN path='' THEN '' ELSE '/' || path END) || '/' || f.name filename,
   jsonb_build_object('size', f.size, 'perm', f.perm, 'uid', f.uid, 'gid', f.gid,
-    'uname', f.uname, 'gname', f.gname) detail
+    'uname', f.uname, 'gname', f.gname, 'ftype', f.ftype) detail
 FROM pv_package_files f
 INNER JOIN tv_packages_new USING (package, version, repo)
 WHERE package!='aosc-aaa' AND ftype='reg' AND (path='usr/local' OR
@@ -122,7 +122,7 @@ SELECT f.package, f.version, f.repo, 322::int errno,
   (1-(perm&1))::smallint "level",
   (CASE WHEN path='' THEN '' ELSE '/' || path END) || '/' || f.name filename,
   jsonb_build_object('size', f.size, 'perm', f.perm, 'uid', f.uid, 'gid', f.gid,
-    'uname', f.uname, 'gname', f.gname) detail
+    'uname', f.uname, 'gname', f.gname, 'ftype', f.ftype) detail
 FROM pv_package_files f
 INNER JOIN tv_packages_new USING (package, version, repo)
 WHERE f.size=0 AND ftype='reg' AND perm & 1=1
@@ -131,10 +131,11 @@ AND name NOT IN ('NEWS', 'ChangeLog', 'INSTALL', 'TODO', 'COPYING', 'AUTHORS',
 AND name NOT LIKE '.%' AND name NOT LIKE '__init__.p%'
 UNION ALL ----- 323 -----
 SELECT f.package, f.version, f.repo, 323::int errno,
-  -(perm&1)::smallint "level",
+  CASE WHEN f.ftype='reg' THEN -(perm&1)::smallint
+  ELSE -(perm&2)::smallint END "level",
   (CASE WHEN path='' THEN '' ELSE '/' || path END) || '/' || name filename,
   jsonb_build_object('size', f.size, 'perm', f.perm, 'uid', f.uid, 'gid', f.gid,
-    'uname', f.uname, 'gname', f.gname) detail
+    'uname', f.uname, 'gname', f.gname, 'ftype', f.ftype) detail
 FROM pv_package_files f
 INNER JOIN tv_packages_new USING (package, version, repo)
 WHERE uid>999 OR gid>999
@@ -142,7 +143,7 @@ UNION ALL ----- 324 -----
 SELECT f.package, f.version, f.repo, 324::int errno, 0::smallint "level",
   (CASE WHEN path='' THEN '' ELSE '/' || path END) || '/' || name filename,
   jsonb_build_object('size', f.size, 'perm', f.perm, 'uid', f.uid, 'gid', f.gid,
-    'uname', f.uname, 'gname', f.gname) detail
+    'uname', f.uname, 'gname', f.gname, 'ftype', f.ftype) detail
 FROM pv_package_files f
 INNER JOIN tv_packages_new USING (package, version, repo)
 WHERE (path IN ('bin', 'sbin', 'usr/bin') AND perm&1=0 AND ftype='reg')
