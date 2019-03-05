@@ -110,9 +110,9 @@ WHERE p.maintainer !~ '^.+ <.+@.+>$'
 OR p.maintainer='Null Packager <null@aosc.xyz>'
 UNION ALL ----- 321 -----
 SELECT f.package, f.version, f.repo, 321::int errno, 0::smallint "level",
-  (CASE WHEN path='' THEN '' ELSE '/' || path END) || '/' || name filename,
-  jsonb_build_object('size', size, 'perm', perm, 'uid', uid, 'gid', gid,
-    'uname', uname, 'gname', gname) detail
+  (CASE WHEN path='' THEN '' ELSE '/' || path END) || '/' || f.name filename,
+  jsonb_build_object('size', f.size, 'perm', f.perm, 'uid', f.uid, 'gid', f.gid,
+    'uname', f.uname, 'gname', f.gname) detail
 FROM pv_package_files f
 INNER JOIN tv_packages_new USING (package, version, repo)
 WHERE package!='aosc-aaa' AND ftype='reg' AND (path='usr/local' OR
@@ -120,7 +120,7 @@ WHERE package!='aosc-aaa' AND ftype='reg' AND (path='usr/local' OR
 UNION ALL ----- 322 -----
 SELECT f.package, f.version, f.repo, 322::int errno,
   (1-(perm&1))::smallint "level",
-  (CASE WHEN path='' THEN '' ELSE '/' || path END) || '/' || name filename,
+  (CASE WHEN path='' THEN '' ELSE '/' || path END) || '/' || f.name filename,
   jsonb_build_object('size', f.size, 'perm', f.perm, 'uid', f.uid, 'gid', f.gid,
     'uname', f.uname, 'gname', f.gname) detail
 FROM pv_package_files f
