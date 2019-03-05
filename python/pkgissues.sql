@@ -110,15 +110,17 @@ WHERE p.maintainer !~ '^.+ <.+@.+>$'
 OR p.maintainer='Null Packager <null@aosc.xyz>'
 UNION ALL ----- 321 -----
 SELECT f.package, f.version, f.repo, 321::int errno, 0::smallint "level",
-  '/' || path || '/' || name filename,
+  (CASE WHEN path='' THEN '' ELSE '/' || path END) || '/' || name filename,
   jsonb_build_object('size', size, 'perm', perm, 'uid', uid, 'gid', gid,
     'uname', uname, 'gname', gname) detail
 FROM pv_package_files f
+INNER JOIN tv_packages_new USING (package, version, repo)
 WHERE package!='aosc-aaa' AND ftype='reg' AND (path='usr/local' OR
   path !~ '^(bin|boot|etc|lib|opt|run|sbin|srv|usr|var)/?.*')
 UNION ALL ----- 322 -----
 SELECT f.package, f.version, f.repo, 322::int errno,
-  (1-(perm&1))::smallint "level", '/' || path || '/' || name filename,
+  (1-(perm&1))::smallint "level",
+  (CASE WHEN path='' THEN '' ELSE '/' || path END) || '/' || name filename,
   jsonb_build_object('size', f.size, 'perm', f.perm, 'uid', f.uid, 'gid', f.gid,
     'uname', f.uname, 'gname', f.gname) detail
 FROM pv_package_files f
@@ -129,15 +131,16 @@ AND name NOT IN ('NEWS', 'ChangeLog', 'INSTALL', 'TODO', 'COPYING', 'AUTHORS',
 AND name NOT LIKE '.%' AND name NOT LIKE '__init__.p%'
 UNION ALL ----- 323 -----
 SELECT f.package, f.version, f.repo, 323::int errno,
-  -(perm&1)::smallint "level", '/' || path || '/' || name filename,
+  -(perm&1)::smallint "level",
+  (CASE WHEN path='' THEN '' ELSE '/' || path END) || '/' || name filename,
   jsonb_build_object('size', f.size, 'perm', f.perm, 'uid', f.uid, 'gid', f.gid,
     'uname', f.uname, 'gname', f.gname) detail
 FROM pv_package_files f
 INNER JOIN tv_packages_new USING (package, version, repo)
 WHERE uid>999 OR gid>999
 UNION ALL ----- 324 -----
-SELECT f.package, f.version, f.repo, 324::int errno,
-  0::smallint "level", '/' || path || '/' || name filename,
+SELECT f.package, f.version, f.repo, 324::int errno, 0::smallint "level",
+  (CASE WHEN path='' THEN '' ELSE '/' || path END) || '/' || name filename,
   jsonb_build_object('size', f.size, 'perm', f.perm, 'uid', f.uid, 'gid', f.gid,
     'uname', f.uname, 'gname', f.gname) detail
 FROM pv_package_files f
@@ -179,7 +182,8 @@ SELECT
 FROM (
   SELECT DISTINCT ON (package, version, repo, filename)
     f1.package, f1.version, f1.repo, 421::int errno, 0::smallint "level",
-    '/' || f1.path || '/' || f1.name filename,
+    (CASE WHEN f1.path='' THEN '' ELSE '/' || f1.path END) ||
+      '/' || f1.name filename,
     jsonb_object('{repo, package, version}',
       ARRAY[f2.repo, f2.package, f2.version]) detail
   FROM pv_package_files f1
