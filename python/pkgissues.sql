@@ -159,7 +159,7 @@ SELECT
     '/' || p.directory) filename,
   jsonb_build_object('paths', jsonb_agg(d.tree || '/' || (CASE WHEN d.category=''
     THEN d.section ELSE d.category || '-' || d.section END) || '/' ||
-    d.directory), 'githash', pv.githash) detail
+    d.directory), 'tree', p.tree, 'githash', pv.githash) detail
 FROM packages p
 INNER JOIN package_duplicate d ON d.package=p.name
 AND NOT (d.tree=p.tree AND d.category=coalesce(p.category, '')
