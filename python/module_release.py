@@ -12,7 +12,7 @@ from internal_pkgscan import sha256_file, size_sha256_fp
 
 logger_rel = logging.getLogger('REL')
 
-def generate(db, base_dir: str, conf_common: dict, conf_branches: dict):
+def generate(db, base_dir: str, conf_common: dict, conf_branches: dict, force: bool):
     dist_dir = base_dir + '/dists.new'
     pool_dir = base_dir + '/pool'
     dist_dir_real = base_dir + '/dists'
@@ -24,7 +24,7 @@ def generate(db, base_dir: str, conf_common: dict, conf_branches: dict):
         branch_name = i.name
         realbranchdir = os.path.join(dist_dir_real, branch_name)
         inrel = PosixPath(realbranchdir).joinpath('InRelease')
-        if inrel.is_file():
+        if not force and inrel.is_file():
             mtime = inrel.stat().st_mtime
             cur = db.cursor()
             cur.execute("SELECT max(mtime) FROM pv_packages p "

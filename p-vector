@@ -52,7 +52,8 @@ def main():
         module_ipc.init()
         module_scan.scan(db, base_dir)
     elif action == 'release':
-        module_release.generate(db, base_dir, conf_common, conf_branches)
+        force = (len(action_args) == 1 and action_args[0] == '--force')
+        module_release.generate(db, base_dir, conf_common, conf_branches, force)
     elif action == 'sync':
         module_sync.sync_db(db)
     elif action == 'analyze':
