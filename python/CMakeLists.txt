@@ -8,7 +8,6 @@ install(FILES
         module_release.py
         module_scan.py
         module_sync.py
-        module_check_elf.py
         vercomp.sql
         abbsdb.sql
         pkgissues.sql
