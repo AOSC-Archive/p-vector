@@ -63,7 +63,8 @@ repo TEXT PRIMARY KEY,
 packagecnt INTEGER,
 ghostcnt INTEGER,
 laggingcnt INTEGER,
-missingcnt INTEGER
+missingcnt INTEGER,
+oldcnt INTEGER
 -- FOREIGN KEY(repo) REFERENCES dpkg_repos(name)
 );
 CREATE INDEX IF NOT EXISTS idx_packages_directory ON packages (directory);
