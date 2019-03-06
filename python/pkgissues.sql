@@ -73,7 +73,7 @@ FROM tv_packages_new p
 INNER JOIN (
   SELECT package, percentile_cont(0.5) WITHIN GROUP (ORDER BY size) medsize
   FROM tv_pv_packages WHERE debtime IS NOT NULL GROUP BY package
-) q1 ON p.package=q1.package AND p.size < q1.medsize/2
+) q1 ON p.package=q1.package AND p.size < q1.medsize/2 AND p.size < 10485760
 WHERE p.debtime IS NOT NULL
 UNION ALL ----- 303 -----
 SELECT package, version, repo, 303::int errno, 0::smallint "level", filename,
