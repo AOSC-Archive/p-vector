@@ -281,7 +281,7 @@ FROM (
       s.soname || s.sodepver filename, r.testing,
       count(d.package) OVER w matchcnt,
       bool_and(k2.tree!='aosc-os-core') OVER w depnotincore,
-      jsonb_object('{dep_package, dep_version, dep_repo}',
+      jsonb_object('{package, version, repo}',
         ARRAY[s.package, p.version, s.repo]) detail
     FROM v_so_breaks s
     INNER JOIN v_packages_new p USING (package, repo)
