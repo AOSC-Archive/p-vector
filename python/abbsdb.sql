@@ -71,7 +71,7 @@ CREATE INDEX IF NOT EXISTS idx_packages_directory ON packages (directory);
 CREATE INDEX IF NOT EXISTS idx_package_versions_githash
 ON package_versions (githash);
 CREATE INDEX IF NOT EXISTS idx_package_dependencies_rev
-ON package_dependencies (dependency);
+ON package_dependencies (dependency) WHERE relationship='PKGDEP';
 
 CREATE OR REPLACE VIEW v_packages AS
 SELECT p.name, p.tree tree, t.category tree_category,

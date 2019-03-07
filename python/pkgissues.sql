@@ -217,8 +217,8 @@ UNION ALL ----- 431 -----
 SELECT
   package, version, repo, 431::int errno, 0::smallint "level", filename, detail
 FROM (
-  SELECT DISTINCT ON (package, version, repo, filename)
-    package, version, repo, (name || ver) filename, ver_provide,
+  SELECT DISTINCT ON (q3.package, q3.version, q3.repo, filename)
+    q3.package, q3.version, q3.repo, (q3.name || q3.ver) filename, ver_provide,
     CASE WHEN package_lib IS NULL THEN NULL ELSE
       jsonb_object('{repo, package, version, sover_provide}',
       ARRAY[repo_lib, package_lib, version_lib, ver_provide]) END detail
@@ -243,15 +243,24 @@ FROM (
     WHERE sd.depends=1 AND (sp.package IS NULL OR vp2.package IS NOT NULL)
     WINDOW w AS (PARTITION BY sd.package, sd.version, sd.repo, sd.name, sd.ver)
   ) q3
+  LEFT JOIN (
+    SELECT sd.name, sd.package, count(dep.package) cnt
+    FROM (
+      SELECT DISTINCT name, package FROM pv_package_sodep WHERE depends=0
+    ) sd
+    INNER JOIN package_dependencies dep
+    ON sd.package=dep.dependency AND dep.relationship='PKGDEP'
+    GROUP BY sd.name, sd.package
+  ) q4 ON q4.name=q3.name AND q4.package=q3.package_lib
   WHERE matchcnt=0
-  ORDER BY package, version, repo, filename, comparable_ver(ver_provide) DESC
-) q4
+  ORDER BY package, version, repo, filename, q4.cnt DESC NULLS LAST
+) q5
 UNION ALL ----- 432 -----
 SELECT package, "version", repo, 432::int errno, 0::smallint "level",
   filename, detail
 FROM (
-  SELECT DISTINCT ON (package, "version", repo, filename)
-    package, "version", repo, filename, detail
+  SELECT DISTINCT ON (q6.package, q6."version", q6.repo, q6.filename)
+    q6.package, q6."version", q6.repo, q6.filename, q6.detail
   FROM (
     WITH RECURSIVE alldep AS (
       SELECT d.package, d.dependency, (s.package IS NOT NULL) sodep
@@ -279,7 +288,7 @@ FROM (
     )
     SELECT s.dep_package package, s.dep_version "version", s.dep_repo repo,
       s.soname || s.sodepver filename, r.testing,
-      count(d.package) OVER w matchcnt,
+      count(d.package) OVER w matchcnt, s.soname, s.package package_lib,
       bool_and(k2.tree!='aosc-os-core') OVER w depnotincore,
       jsonb_object('{package, version, repo}',
         ARRAY[s.package, p.version, s.repo]) detail
@@ -295,10 +304,19 @@ FROM (
     WHERE k1.tree!='aosc-os-core'
     WINDOW w AS (PARTITION BY
       s.dep_package, s.dep_version, s.dep_repo, s.soname, s.sodepver)
-  ) q5
+  ) q6
+  LEFT JOIN (
+    SELECT sd.name, sd.package, count(dep.package) cnt
+    FROM (
+      SELECT DISTINCT name, package FROM pv_package_sodep WHERE depends=0
+    ) sd
+    INNER JOIN package_dependencies dep
+    ON sd.package=dep.dependency AND dep.relationship='PKGDEP'
+    GROUP BY sd.name, sd.package
+  ) q7 ON q7.name=q6.soname AND q7.package=q6.package_lib
   WHERE matchcnt=0 AND depnotincore
-  ORDER BY package, "version", repo, filename, -testing
-) q6
+  ORDER BY package, "version", repo, filename, q7.cnt DESC NULLS LAST, -testing
+) q8
 ;
 
 CREATE TEMP TABLE t_touched AS
