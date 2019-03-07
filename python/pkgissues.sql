@@ -359,4 +359,34 @@ WHERE p.package IS NULL;
 DROP TABLE t_touched;
 DROP TABLE t_package_issues;
 
+CREATE TEMP TABLE t_issues_stats AS
+SELECT coalesce(q1.repo, '') repo, coalesce(q1.errno, 0) errno,
+  q1.cnt, coalesce(q2.total, s.cnt) total
+FROM (
+  SELECT repo, errno, count(DISTINCT package) cnt
+  FROM pv_package_issues
+  GROUP BY GROUPING SETS ((repo, errno), (repo), (errno), ())
+) q1
+LEFT JOIN (
+  SELECT repo, count(package) cnt FROM v_packages_new
+  GROUP BY GROUPING SETS ((repo), ())
+) s ON s.repo IS NOT DISTINCT FROM q1.repo
+LEFT JOIN (
+  SELECT b.name repo, count(DISTINCT p.name) total
+  FROM package_versions v
+  INNER JOIN packages p ON v.package=p.name
+  INNER JOIN tree_branches b ON b.tree=p.tree AND b.branch=v.branch
+  GROUP BY GROUPING SETS ((b.name), ())
+) q2 ON q2.repo IS NOT DISTINCT FROM q1.repo;
+
+INSERT INTO pv_issues_stats (repo, errno, cnt, total)
+SELECT t.repo, t.errno, t.cnt, t.total
+FROM t_issues_stats t
+LEFT JOIN (
+  SELECT DISTINCT ON (repo, errno) repo, errno, cnt, total
+  FROM pv_issues_stats
+  ORDER BY repo, errno, updated DESC
+) q USING (repo, errno, cnt, total)
+WHERE q.repo IS NULL;
+
 COMMIT;

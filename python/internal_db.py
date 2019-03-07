@@ -164,6 +164,13 @@ def init_db(db):
                 'detail JSONB,'
                 'UNIQUE (package, version, repo, errno, filename)'
                 ')')
+    cur.execute('CREATE TABLE IF NOT EXISTS pv_issues_stats ('
+                'repo TEXT,'
+                'errno INTEGER,'
+                'cnt INTEGER,'
+                'total INTEGER,'
+                'updated TIMESTAMP WITH TIME ZONE DEFAULT (now())'
+                ')')
     cur.execute('CREATE MATERIALIZED VIEW IF NOT EXISTS v_packages_new AS '
                 'SELECT DISTINCT ON (repo, package) package, version, repo, '
                 '  architecture, filename, size, sha256, mtime, debtime, '
@@ -185,6 +192,8 @@ def init_db(db):
                 ' ON pv_package_issues USING brin (mtime)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_issues_atime'
                 ' ON pv_package_issues (atime)')
+    cur.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_pv_issues_stats_pkey'
+                ' ON pv_issues_stats (repo, errno, updated DESC)')
     db.commit()
     try:
         cur.execute("SELECT 'comparable_dpkgver'::regproc")
