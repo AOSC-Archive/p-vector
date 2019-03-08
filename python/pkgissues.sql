@@ -3,7 +3,8 @@ BEGIN;
 DELETE FROM pv_package_issues WHERE id IN (
   SELECT i.id FROM pv_package_issues i
   LEFT JOIN pv_packages p USING (package, version, repo)
-  WHERE p.package IS NULL
+  LEFT JOIN v_packages_new n USING (package, version, repo)
+  WHERE p.package IS NULL AND (i.errno IN (301, 402, 412) OR n.package IS NULL)
 );
 
 CREATE TEMP VIEW tv_updated AS
