@@ -6,12 +6,12 @@ DELETE FROM pv_package_issues WHERE id IN (
   LEFT JOIN v_packages_new n USING (package, version, repo)
   LEFT JOIN tree_branches b ON b.name=i.repo
   LEFT JOIN package_versions v ON v.package=i.package AND v.branch=b.branch
-  AND b.version=((CASE WHEN coalesce(v.epoch, '') = '' THEN ''
+  AND i.version=((CASE WHEN coalesce(v.epoch, '') = '' THEN ''
     ELSE v.epoch || ':' END) || v.version ||
    (CASE WHEN coalesce(v.release, '') IN ('', '0') THEN ''
     ELSE '-' || v.release END))
   WHERE p.package IS NULL AND (
-    b.package IS NULL AND (i.errno IN (301, 402, 412) OR n.package IS NULL)
+    b.name IS NULL AND (i.errno IN (301, 402, 412) OR n.package IS NULL)
     OR v.package IS NULL
   )
 );
