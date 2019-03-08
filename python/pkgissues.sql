@@ -4,7 +4,16 @@ DELETE FROM pv_package_issues WHERE id IN (
   SELECT i.id FROM pv_package_issues i
   LEFT JOIN pv_packages p USING (package, version, repo)
   LEFT JOIN v_packages_new n USING (package, version, repo)
-  WHERE p.package IS NULL AND (i.errno IN (301, 402, 412) OR n.package IS NULL)
+  LEFT JOIN tree_branches b ON b.name=i.repo
+  LEFT JOIN package_versions v ON v.package=i.package AND v.branch=b.branch
+  AND b.version=((CASE WHEN coalesce(v.epoch, '') = '' THEN ''
+    ELSE v.epoch || ':' END) || v.version ||
+   (CASE WHEN coalesce(v.release, '') IN ('', '0') THEN ''
+    ELSE '-' || v.release END))
+  WHERE p.package IS NULL AND (
+    b.package IS NULL AND (i.errno IN (301, 402, 412) OR n.package IS NULL)
+    OR v.package IS NULL
+  )
 );
 
 CREATE TEMP VIEW tv_updated AS
@@ -55,13 +64,17 @@ AND v.release IS NOT DISTINCT FROM r.release
 AND v.epoch IS NOT DISTINCT FROM r.epoch
 WHERE e.package IS NOT NULL
 UNION ALL ----- 103 -----
-SELECT p.name package, p.full_version "version", b.name repo,
+SELECT p.name package, ((CASE WHEN coalesce(v.epoch, '') = '' THEN ''
+    ELSE v.epoch || ':' END) || v.version ||
+   (CASE WHEN coalesce(v.release, '') IN ('', '0') THEN ''
+    ELSE '-' || v.release END)) "version", b.name repo,
   103::int errno, 0::smallint "level",
   coalesce(p.category || '-' || p.section, p.section) ||
     '/' || p.directory || '/spec' filename,
   null::jsonb detail
-FROM v_packages p
-INNER JOIN tree_branches b ON b.tree=p.tree
+FROM packages p
+INNER JOIN package_versions v ON v.package=p.name
+INNER JOIN tree_branches b ON b.tree=p.tree AND b.branch=v.branch
 WHERE p.name !~ '^[a-z0-9][a-z0-9+.-]*$'  -- except "r"
 UNION ALL ----- 301 -----
 SELECT package, version, repo, 301::int errno, 0::smallint "level",
