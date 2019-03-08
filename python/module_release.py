@@ -24,7 +24,7 @@ def generate(db, base_dir: str, conf_common: dict, conf_branches: dict, force: b
         realbranchdir = os.path.join(dist_dir_real, branch_name)
         inrel = PosixPath(realbranchdir).joinpath('InRelease')
         if not force and inrel.is_file():
-            mtime = inrel.stat().st_mtime
+            mtime = inrel.stat().st_mtime - 3600
             cur = db.cursor()
             cur.execute("SELECT max(mtime) FROM pv_packages p "
                 "INNER JOIN pv_repos r ON r.name=p.repo WHERE r.branch=%s",
