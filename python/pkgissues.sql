@@ -10,10 +10,9 @@ DELETE FROM pv_package_issues WHERE id IN (
     ELSE v.epoch || ':' END) || v.version ||
    (CASE WHEN coalesce(v.release, '') IN ('', '0') THEN ''
     ELSE '-' || v.release END))
-  WHERE p.package IS NULL AND (
-    b.name IS NULL AND (i.errno IN (301, 402, 412) OR n.package IS NULL)
-    OR v.package IS NULL
-  )
+  WHERE CASE WHEN b.name IS NULL THEN (p.package IS NULL OR
+    i.errno IN (301, 402, 412) OR n.package IS NULL)
+    ELSE v.package IS NULL END
 );
 
 CREATE TEMP VIEW tv_updated AS
