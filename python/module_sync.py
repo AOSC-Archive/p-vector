@@ -29,7 +29,7 @@ logger_sync = logging.getLogger('SYNC')
 
 def download_db(url, filename, etag=None):
     headers = {'If-None-Match': etag}
-    r = requests.get(url, headers=headers, stream=True)
+    r = requests.get(url, headers=headers, stream=True, timeout=30)
     r.raise_for_status()
     newetag = r.headers.get('ETag')
     if r.status_code == 304:
@@ -58,8 +58,12 @@ def escape_val(x):
         return str(x)
 
 def make_copy(dbname, table, fd, idxcol=None):
-    db = sqlite3.connect(dbname)
-    cur = db.execute("SELECT * FROM " + table)
+    try:
+        db = sqlite3.connect(dbname)
+        cur = db.execute("SELECT * FROM " + table)
+    except Exception:
+        os.close(fd)
+        raise
     with open(fd, 'w', encoding='utf-8') as f:
         for row in cur:
             if idxcol is not None:
