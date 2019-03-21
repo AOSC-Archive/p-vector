@@ -151,7 +151,7 @@ def init_db(db):
                 # 'PRIMARY KEY (package, version, repo, path, name)'
                 ')')
     cur.execute('CREATE TABLE IF NOT EXISTS pv_package_issues ('
-                'id SERIAL,'
+                'id SERIAL PRIMARY KEY,'
                 'package TEXT,'
                 'version TEXT,'
                 'repo TEXT,'
