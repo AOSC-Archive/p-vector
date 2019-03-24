@@ -73,6 +73,28 @@ AND pi.errno=431 AND pi.detail IS NOT NULL
 WHERE sp.depends=0
 '''
 
+SQL_v_so_breaks_dep = '''
+CREATE MATERIALIZED VIEW IF NOT EXISTS v_so_breaks_dep AS
+WITH pkg_so_breaks AS (SELECT DISTINCT package, dep_package FROM v_so_breaks)
+SELECT s.package, s.dep_package, coalesce(deplist, array[]::text[]) deplist
+FROM pkg_so_breaks s
+LEFT JOIN (
+  SELECT s1.package, s1.dep_package, array_agg(s2.dep_package) deplist
+  FROM pkg_so_breaks s1
+  INNER JOIN pkg_so_breaks s2
+  ON s1.package=s2.package AND s1.dep_package!=s2.dep_package
+  INNER JOIN (
+    SELECT package, dependency
+    FROM package_dependencies
+    WHERE relationship IN ('PKGDEP', 'BUILDDEP')
+    UNION
+    SELECT dep_package package, package dependency FROM pkg_so_breaks
+  ) d
+  ON d.dependency=s1.dep_package AND d.package=s2.dep_package
+  GROUP BY s1.package, s1.dep_package
+) q USING (package, dep_package);
+'''
+
 def init_db(db):
     cur = db.cursor()
     cur.execute('CREATE TABLE IF NOT EXISTS pv_repos ('
@@ -209,6 +231,7 @@ def init_index(db, refresh=True):
     cur = db.cursor()
     cur.execute(SQL_v_dpkg_dependencies)
     cur.execute(SQL_v_so_breaks)
+    cur.execute(SQL_v_so_breaks_dep)
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_packages_mtime'
                 ' ON pv_packages (mtime)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_sodep_package'
@@ -225,6 +248,7 @@ def init_index(db, refresh=True):
         cur.execute('REFRESH MATERIALIZED VIEW v_packages_new')
         cur.execute('REFRESH MATERIALIZED VIEW v_dpkg_dependencies')
         cur.execute('REFRESH MATERIALIZED VIEW v_so_breaks')
+        cur.execute('REFRESH MATERIALIZED VIEW v_so_breaks_dep')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_packages_new_package'
                 ' ON v_packages_new (package, repo, version)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_v_packages_new_mtime'
