@@ -46,22 +46,56 @@ AND p.category IS NOT DISTINCT FROM e.category
 AND p.section=e.section AND p.directory=e.directory
 WHERE e.package IS NULL
 UNION ALL ----- 102 -----
-SELECT r.package, ((CASE WHEN coalesce(r.epoch, '') = '' THEN ''
-    ELSE r.epoch || ':' END) || r.version ||
-   (CASE WHEN coalesce(r.release, '') IN ('', '0') THEN ''
-    ELSE '-' || r.release END)) "version", t.name || '/' || v.branch repo,
-  102::int errno, 0::smallint "level", e.filename,
-  jsonb_build_object('err', e.err, 'tree', t.name, 'githash', m.githash) detail
-FROM repo_package_basherr e
-INNER JOIN repo_package_rel r USING (tree, rid, package)
-INNER JOIN repo_marks m USING (tree, rid)
-INNER JOIN trees t ON t.tid=m.tree
-INNER JOIN package_versions v
-ON v.package=r.package AND v.githash=m.githash
-AND v.version IS NOT DISTINCT FROM r.version
-AND v.release IS NOT DISTINCT FROM r.release
-AND v.epoch IS NOT DISTINCT FROM r.epoch
-WHERE e.package IS NOT NULL
+SELECT package, ((CASE WHEN coalesce(epoch, '') = '' THEN ''
+    ELSE epoch || ':' END) || version ||
+   (CASE WHEN coalesce("release", '') IN ('', '0') THEN ''
+    ELSE '-' || "release" END)) "version", tree || '/' || branch repo,
+  102::int errno, 0::smallint "level", filename,
+  jsonb_build_object('err', string_agg(err, chr(10)),
+    'tree', tree, 'githash', githash) detail
+FROM (
+  SELECT
+    r.package, r.epoch, r.version, r.release, t.name tree, v.branch, e.filename,
+    e.err, m.githash
+  FROM repo_package_basherr e
+  INNER JOIN repo_package_rel r USING (tree, rid, package)
+  INNER JOIN repo_marks m USING (tree, rid)
+  INNER JOIN trees t ON t.tid=m.tree
+  INNER JOIN package_versions v
+  ON v.package=r.package AND v.githash=m.githash
+  AND v.version IS NOT DISTINCT FROM r.version
+  AND v.release IS NOT DISTINCT FROM r.release
+  AND v.epoch IS NOT DISTINCT FROM r.epoch
+  WHERE e.package IS NOT NULL
+  UNION ALL
+  SELECT
+    p.name package, v.epoch, v.version, v.release, p.tree, v.branch,
+    coalesce(p.category || '-', '') || p.section || '/' || p.directory
+      || '/' || 'autobuild/defines' filename,
+    rtrim(CASE WHEN p.pkg_section IS NULL
+        THEN 'PKGSEC: not defined' || chr(10) ELSE '' END ||
+      CASE WHEN p.pkg_section LIKE '% %'
+        THEN 'PKGSEC: not valid' || chr(10) ELSE '' END ||
+      CASE WHEN p.description IS NULL
+        THEN 'PKGDES: not defined' || chr(10) ELSE '' END ||
+      CASE WHEN
+        replace(lower(p.description), ' ', '-') = p.name OR
+        replace(lower(p.description), ' ', '') = p.name
+        THEN 'PKGSEC: not descriptive (' || p.description || ')' || chr(10)
+        ELSE '' END ||
+      CASE WHEN v.epoch !~ '^[0-9]+$'
+        THEN 'PKGEPOCH: "' || v.epoch || '" is not a number' || chr(10)
+        ELSE '' END, chr(10)) err,
+    v.githash
+  FROM packages p
+  INNER JOIN package_versions v ON v.package=p.name
+  WHERE p.pkg_section IS NULL OR p.pkg_section LIKE '% %'
+  OR p.description IS NULL
+  OR replace(lower(p.description), ' ', '-') = p.name
+  OR replace(lower(p.description), ' ', '') = p.name
+  OR v.epoch !~ '^[0-9]+$'
+) q
+GROUP BY package, githash, tree, branch, filename, epoch, version, "release"
 UNION ALL ----- 103 -----
 SELECT p.name package, ((CASE WHEN coalesce(v.epoch, '') = '' THEN ''
     ELSE v.epoch || ':' END) || v.version ||
