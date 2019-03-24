@@ -105,24 +105,27 @@ def scan_dir(db, base_dir: str, branch: str, component: str):
     comppath = '%s/%s' % (branch, component)
     cur = db.cursor()
     cur.execute("""SELECT p.package, p.version, p.repo, p.architecture,
-          p.filename, p.size, p.mtime
+          p.filename, p.size, p.mtime, p.sha256
         FROM pv_packages p
         INNER JOIN pv_repos r ON p.repo=r.name WHERE r.path=%s
         UNION ALL
         SELECT p.package, p.version, p.repo, p.architecture,
-          p.filename, p.size, p.mtime
+          p.filename, p.size, p.mtime, p.sha256
         FROM pv_package_duplicate p
         INNER JOIN pv_repos r ON p.repo=r.name WHERE r.path=%s""",
         (comppath, comppath))
     dup_pkgs = set()
     ignore_files = set()
     del_list = []
-    for package, version, repopath, architecture, filename, size, mtime in cur:
+    for package, version, repopath, architecture, filename, size, mtime, sha256 in cur:
         fullpath = PosixPath(base_dir).joinpath(filename)
         if fullpath.is_file():
             stat = fullpath.stat()
-            if size == stat.st_size and mtime == int(stat.st_mtime):
-                ignore_files.add(str(fullpath))
+            if size == stat.st_size:
+                sfullpath = str(fullpath)
+                if (mtime == int(stat.st_mtime) or
+                    internal_pkgscan.sha256_file(sfullpath) == sha256):
+                    ignore_files.add(sfullpath)
             else:
                 dup_pkgs.add(filename)
                 del_list.append((filename, package, version, repopath))
