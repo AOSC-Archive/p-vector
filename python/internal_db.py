@@ -109,6 +109,8 @@ def init_db(db):
                 ')')
     cur.execute('ALTER TABLE pv_repos ADD COLUMN IF NOT EXISTS '
                 'mtime TIMESTAMP WITH TIME ZONE')
+    cur.execute('UPDATE pv_repos r SET mtime=(SELECT to_timestamp(max(mtime)) '
+                'FROM pv_packages p WHERE p.repo=r.name) WHERE mtime IS NULL')
     cur.execute('CREATE TABLE IF NOT EXISTS pv_packages ('
                 'package TEXT,'
                 'version TEXT,'
