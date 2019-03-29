@@ -116,6 +116,7 @@ def scan_dir(db, base_dir: str, branch: str, component: str):
         (comppath, comppath))
     dup_pkgs = set()
     ignore_files = set()
+    modified_repo = set()
     del_list = []
     for package, version, repopath, architecture, filename, size, mtime, sha256 in cur:
         fullpath = PosixPath(base_dir).joinpath(filename)
@@ -143,6 +144,7 @@ def scan_dir(db, base_dir: str, branch: str, component: str):
             "WHERE package=%s AND version=%s AND repo=%s", row[1:])
         cur.execute("DELETE FROM pv_packages WHERE filename=%s", (row[0],))
         cur.execute("DELETE FROM pv_package_duplicate WHERE filename=%s", (row[0],))
+        modified_repo.add(row[1:][-1])
     #check_list = [[] for _ in range(4)]
     check_list = []
     for fullpath in search_path.rglob('*.deb'):
@@ -169,10 +171,11 @@ def scan_dir(db, base_dir: str, branch: str, component: str):
             if component != 'main':
                 realname = component + '-' + realname
             repo = '%s/%s' % (realname, branch)
-            cur.execute("INSERT INTO pv_repos VALUES (%s,%s,%s,%s,%s,%s,%s) "
+            cur.execute("INSERT INTO pv_repos VALUES (%s,%s,%s,%s,%s,%s,%s,now()) "
                 "ON CONFLICT DO NOTHING",
                 (repo, realname, comppath, BRANCHES.index(branch),
                 branch, component, pkginfo['architecture']))
+            modified_repo.add(repo)
             pkginfo['repo'] = repo
             dbkey = (pkginfo['package'], pkginfo['version'], repo)
             if pkginfo['filename'] in dup_pkgs:
@@ -239,10 +242,12 @@ def scan_dir(db, base_dir: str, branch: str, component: str):
             for row in files:
                 cur.execute("INSERT INTO pv_package_files VALUES "
                     "(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", dbkey + row)
+    for repo in modified_repo:
+        cur.execute("UPDATE pv_repos SET mtime=now() WHERE name=%s", (repo,))
 
 def table_mtime(db):
     cur = db.cursor()
-    cur.execute("SELECT max(mtime) FROM pv_packages")
+    cur.execute("SELECT coalesce(extract(epoch FROM max(mtime)), 0) FROM pv_repos")
     result = cur.fetchone()[0]
     cur.close()
     return result

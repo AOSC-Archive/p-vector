@@ -104,8 +104,11 @@ def init_db(db):
                 'testing INTEGER,'   # 0, 1, 2
                 'branch TEXT,'       # stable, testing, explosive
                 'component TEXT,'    # main, bsp-sunxi, opt-avx2
-                'architecture TEXT'  # amd64, all
+                'architecture TEXT,'  # amd64, all
+                'mtime TIMESTAMP WITH TIME ZONE'
                 ')')
+    cur.execute('ALTER TABLE pv_repos ADD COLUMN IF NOT EXISTS '
+                'mtime TIMESTAMP WITH TIME ZONE')
     cur.execute('CREATE TABLE IF NOT EXISTS pv_packages ('
                 'package TEXT,'
                 'version TEXT,'
@@ -232,6 +235,8 @@ def init_index(db, refresh=True):
     cur.execute(SQL_v_dpkg_dependencies)
     cur.execute(SQL_v_so_breaks)
     cur.execute(SQL_v_so_breaks_dep)
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_repos_mtime'
+                ' ON pv_repos (mtime)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_packages_mtime'
                 ' ON pv_packages (mtime)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_pv_package_sodep_package'
