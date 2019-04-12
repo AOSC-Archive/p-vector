@@ -200,12 +200,8 @@ SELECT p.name package, min((CASE WHEN coalesce(v.epoch, '') = '' THEN ''
     ELSE v.epoch || ':' END) || v.version ||
    (CASE WHEN coalesce(v.release, '') IN ('', '0') THEN ''
     ELSE '-' || v.release END)) "version", b.name repo,
-  401::int errno, 0::smallint "level",
-  min(coalesce(p.category || '-' || p.section, p.section) ||
-    '/' || p.directory) || '/autobuild/defines' filename,
-  jsonb_build_object('missing', jsonb_agg(
-    jsonb_object('{package, relop, version}',
-    ARRAY[d.dependency, d.relop, d.version]))) detail
+  401::int errno, 0::smallint "level", d.dependency filename,
+  jsonb_object('{relop, version}', ARRAY[min(d.relop), min(d.version)]) detail
 FROM packages p
 INNER JOIN package_versions v ON v.package=p.name
 INNER JOIN tree_branches b ON b.tree=p.tree AND b.branch=v.branch
@@ -217,7 +213,7 @@ AND compare_dpkgrel(comparable_dpkgver((
    (CASE WHEN coalesce(v.release, '') IN ('', '0') THEN ''
     ELSE '-' || v.release END)), d.relop, comparable_dpkgver(d.version))
 WHERE d.relationship='BUILDDEP' AND p2.name IS NULL
-GROUP BY p.name, b.name
+GROUP BY p.name, b.name, d.dependency
 UNION ALL ----- 402 -----
 SELECT
   p.name package, ((CASE WHEN coalesce(pv.epoch, '') = '' THEN ''
@@ -240,30 +236,24 @@ ON pv.package = p.name AND pv.branch = t.mainbranch
 GROUP BY p.name, pv.epoch, pv.version, pv.release, pv.branch, pv.githash,
   p.tree, p.category, p.section, p.directory
 UNION ALL ----- 411 -----
-SELECT package, version, repo, 411::int errno, min("level") "level",
-  filename, jsonb_build_object('missing', jsonb_agg(rel)) detail
-FROM (
-  SELECT v1.package, v1.version, v1.repo, v1.filename,
-    (d1.relationship!='Depends')::int::smallint "level",
-    jsonb_object('{relationship, package, relop, version}',
-      ARRAY[d1.relationship, d1.deppkg, d1.relop, d1.depver]) rel
-  FROM v_packages_new v1
-  INNER JOIN pv_repos r1 ON r1.name=v1.repo
-  INNER JOIN pv_repos r2 ON (r1.component!='main' OR r2.component='main')
-  AND (r1.architecture='all' OR r2.architecture IN (r1.architecture, 'all'))
-  AND r2.testing<=r1.testing
-  INNER JOIN v_dpkg_dependencies d1
-  ON d1.package=v1.package AND d1.version=v1.version AND d1.repo=v1.repo
-  AND d1.relationship IN ('Depends', 'Pre-Depends', 'Recommends', 'Suggests')
-  AND (d1.deparch IS NULL OR d1.deparch=r2.architecture)
-  LEFT JOIN v_packages_new v2
-  ON v2.repo=r2.name AND v2.package!=v1.package AND d1.deppkg=v2.package
-  AND compare_dpkgrel(v2._vercomp, d1.relop, d1.depvercomp)
-  GROUP BY v1.package, v1.version, v1.repo, v1.filename,
-    d1.relationship, d1.deppkg, d1.relop, d1.depver
-  HAVING count(v2.package)=0
-) q_dep
-GROUP BY package, version, repo, filename
+SELECT v1.package, v1.version, v1.repo, 411::int errno,
+  min((d1.relationship!='Depends')::int)::smallint "level", d1.deppkg filename,
+  jsonb_object('{relationship, relop, version}',
+    ARRAY[min(d1.relationship), min(d1.relop), min(d1.depver)]) detail
+FROM v_packages_new v1
+INNER JOIN pv_repos r1 ON r1.name=v1.repo
+INNER JOIN pv_repos r2 ON (r1.component!='main' OR r2.component='main')
+AND (r1.architecture='all' OR r2.architecture IN (r1.architecture, 'all'))
+AND r2.testing<=r1.testing
+INNER JOIN v_dpkg_dependencies d1
+ON d1.package=v1.package AND d1.version=v1.version AND d1.repo=v1.repo
+AND d1.relationship IN ('Depends', 'Pre-Depends', 'Recommends', 'Suggests')
+AND (d1.deparch IS NULL OR d1.deparch=r2.architecture)
+LEFT JOIN v_packages_new v2
+ON v2.repo=r2.name AND v2.package!=v1.package AND d1.deppkg=v2.package
+AND compare_dpkgrel(v2._vercomp, d1.relop, d1.depvercomp)
+GROUP BY v1.package, v1.version, v1.repo, v1.filename, d1.deppkg
+HAVING count(v2.package)=0
 UNION ALL ----- 412 -----
 SELECT
   d.package, d.version, d.repo, 412::int errno, 0::smallint "level",
