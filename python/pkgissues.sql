@@ -195,6 +195,27 @@ FROM pv_package_files f
 INNER JOIN tv_packages_new USING (package, version, repo)
 WHERE (path IN ('bin', 'sbin', 'usr/bin') AND perm&1=0 AND ftype='reg')
 OR (ftype='dir' AND perm&64=0)
+UNION ALL ----- 401 -----
+SELECT p.name package, ((CASE WHEN coalesce(v.epoch, '') = '' THEN ''
+    ELSE v.epoch || ':' END) || v.version ||
+   (CASE WHEN coalesce(v.release, '') IN ('', '0') THEN ''
+    ELSE '-' || v.release END)) "version", b.name repo,
+  401::int errno, 0::smallint "level",
+  coalesce(p.category || '-' || p.section, p.section) ||
+    '/' || p.directory || '/autobuild/defines' filename,
+  jsonb_object('{package, relop, version}',
+    ARRAY[d.dependency, d.relop, d.version]) detail
+FROM packages p
+INNER JOIN package_versions v ON v.package=p.name
+INNER JOIN tree_branches b ON b.tree=p.tree AND b.branch=v.branch
+INNER JOIN package_dependencies d ON d.package=p.name
+LEFT JOIN packages p2 ON p2.name=d.dependency
+AND compare_dpkgrel(comparable_dpkgver((
+  CASE WHEN coalesce(v.epoch, '') = '' THEN ''
+    ELSE v.epoch || ':' END) || v.version ||
+   (CASE WHEN coalesce(v.release, '') IN ('', '0') THEN ''
+    ELSE '-' || v.release END)), d.relop, comparable_dpkgver(d.version))
+WHERE d.relationship='BUILDDEP' AND p2.name IS NULL
 UNION ALL ----- 402 -----
 SELECT
   p.name package, ((CASE WHEN coalesce(pv.epoch, '') = '' THEN ''
@@ -216,6 +237,26 @@ INNER JOIN package_versions pv
 ON pv.package = p.name AND pv.branch = t.mainbranch
 GROUP BY p.name, pv.epoch, pv.version, pv.release, pv.branch, pv.githash,
   p.tree, p.category, p.section, p.directory
+UNION ALL ----- 411 -----
+SELECT v1.package, v1.version, v1.repo, 411::int errno,
+  (d1.relationship!='Depends')::int::smallint "level",
+  v1.filename, jsonb_object('{relationship, package, relop, version}',
+    ARRAY[d1.relationship, d1.deppkg, d1.relop, d1.depver]) detail
+FROM v_packages_new v1
+INNER JOIN pv_repos r1 ON r1.name=v1.repo
+INNER JOIN pv_repos r2 ON (r1.component!='main' OR r2.component='main')
+AND (r1.architecture='all' OR r2.architecture IN (r1.architecture, 'all'))
+AND r2.testing<=r1.testing
+INNER JOIN v_dpkg_dependencies d1
+ON d1.package=v1.package AND d1.version=v1.version AND d1.repo=v1.repo
+AND d1.relationship IN ('Depends', 'Pre-Depends', 'Recommends', 'Suggests')
+AND (d1.deparch IS NULL OR d1.deparch=r2.architecture)
+LEFT JOIN v_packages_new v2
+ON v2.repo=r2.name AND v2.package!=v1.package AND d1.deppkg=v2.package
+AND compare_dpkgrel(v2._vercomp, d1.relop, d1.depvercomp)
+GROUP BY v1.package, v1.version, v1.repo, v1.filename,
+  d1.relationship, d1.deppkg, d1.relop, d1.depver
+HAVING count(v2.package)=0
 UNION ALL ----- 412 -----
 SELECT
   d.package, d.version, d.repo, 412::int errno, 0::smallint "level",
@@ -370,7 +411,8 @@ CREATE TEMP TABLE t_touched AS
 SELECT i.id FROM pv_package_issues i
 INNER JOIN tv_pv_packages p USING (package, version, repo)
 UNION ALL
-SELECT i.id FROM pv_package_issues i WHERE errno < 200 OR errno=431;
+SELECT i.id FROM pv_package_issues i
+WHERE errno < 200 OR errno IN (401, 402, 411, 431);
 
 DELETE FROM pv_package_issues WHERE id IN (
   SELECT p.id
