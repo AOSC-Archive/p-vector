@@ -275,7 +275,7 @@ FROM (
       sp.package package_lib, sp.version version_lib, sd.ver, sp.ver ver_provide,
       count(sp2.package) OVER w matchcnt
     FROM pv_package_sodep sd
-    INNER JOIN tv_packages_new vp USING (package, version, repo)
+    INNER JOIN v_packages_new vp USING (package, version, repo)
     INNER JOIN pv_repos rd ON rd.name=sd.repo
     INNER JOIN pv_repos rp ON rd.architecture IN (rp.architecture, 'all')
     AND rp.testing<=rd.testing AND rp.component IN (rd.component, 'main')
@@ -370,7 +370,7 @@ CREATE TEMP TABLE t_touched AS
 SELECT i.id FROM pv_package_issues i
 INNER JOIN tv_pv_packages p USING (package, version, repo)
 UNION ALL
-SELECT i.id FROM pv_package_issues i WHERE errno < 200;
+SELECT i.id FROM pv_package_issues i WHERE errno < 200 OR errno=431;
 
 DELETE FROM pv_package_issues WHERE id IN (
   SELECT p.id
