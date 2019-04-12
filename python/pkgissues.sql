@@ -203,7 +203,7 @@ SELECT p.name package, min((CASE WHEN coalesce(v.epoch, '') = '' THEN ''
   401::int errno, 0::smallint "level",
   min(coalesce(p.category || '-' || p.section, p.section) ||
     '/' || p.directory) || '/autobuild/defines' filename,
-  json_build_object('missing', jsonb_agg(
+  jsonb_build_object('missing', jsonb_agg(
     jsonb_object('{package, relop, version}',
     ARRAY[d.dependency, d.relop, d.version]))) detail
 FROM packages p
