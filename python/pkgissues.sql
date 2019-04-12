@@ -241,7 +241,7 @@ GROUP BY p.name, pv.epoch, pv.version, pv.release, pv.branch, pv.githash,
   p.tree, p.category, p.section, p.directory
 UNION ALL ----- 411 -----
 SELECT package, version, repo, 411::int errno, min("level") "level",
-  filename, jsonb_object('{missing}', ARRAY[jsonb_agg(rel)]) detail
+  filename, jsonb_build_object('missing', jsonb_agg(rel)) detail
 FROM (
   SELECT v1.package, v1.version, v1.repo, v1.filename,
     (d1.relationship!='Depends')::int::smallint "level",
