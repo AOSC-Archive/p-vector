@@ -35,17 +35,18 @@ def generate(db, base_dir: str, conf_common: dict, conf_branches: dict, force: b
                 shutil.copytree(realbranchdir, os.path.join(dist_dir, branch_name))
                 logger_rel.info('Skip generating Packages and Contents for %s', branch_name)
                 skip = True
-        if not skip:
-            component_name_list = []
-            for j in PosixPath(pool_dir).joinpath(branch_name).iterdir():
-                if not j.is_dir():
-                    continue
-                component_name = j.name
-                component_name_list.append(component_name)
-                logger_rel.info('Generating Packages for %s-%s', branch_name, component_name)
-                gen_packages(db, dist_dir, branch_name, component_name)
-                logger_rel.info('Generating Contents for %s-%s', branch_name, component_name)
-                gen_contents(db, branch_name, component_name, dist_dir)
+        component_name_list = []
+        for j in PosixPath(pool_dir).joinpath(branch_name).iterdir():
+            if not j.is_dir():
+                continue
+            component_name = j.name
+            component_name_list.append(component_name)
+            if skip:
+                continue
+            logger_rel.info('Generating Packages for %s-%s', branch_name, component_name)
+            gen_packages(db, dist_dir, branch_name, component_name)
+            logger_rel.info('Generating Contents for %s-%s', branch_name, component_name)
+            gen_contents(db, branch_name, component_name, dist_dir)
 
         conf = conf_common.copy()
         conf.update(conf_branches[branch_name])
