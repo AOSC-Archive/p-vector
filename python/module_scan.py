@@ -122,11 +122,10 @@ def scan_dir(db, base_dir: str, branch: str, component: str):
         fullpath = PosixPath(base_dir).joinpath(filename)
         if fullpath.is_file():
             stat = fullpath.stat()
-            if size == stat.st_size:
-                sfullpath = str(fullpath)
-                if (mtime == int(stat.st_mtime) or
-                    internal_pkgscan.sha256_file(sfullpath) == sha256):
-                    ignore_files.add(sfullpath)
+            sfullpath = str(fullpath)
+            if size == stat.st_size and (mtime == int(stat.st_mtime) or
+                internal_pkgscan.sha256_file(sfullpath) == sha256):
+                ignore_files.add(sfullpath)
             else:
                 dup_pkgs.add(filename)
                 del_list.append((filename, package, version, repopath))
