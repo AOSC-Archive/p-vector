@@ -17,6 +17,7 @@ def generate(db, base_dir: str, conf_common: dict, conf_branches: dict, force: b
     pool_dir = base_dir + '/pool'
     dist_dir_real = base_dir + '/dists'
     dist_dir_old = base_dir + '/dists.old'
+    shutil.rmtree(dist_dir, ignore_errors=True)
     for i in PosixPath(pool_dir).iterdir():
         if not i.is_dir():
             continue
