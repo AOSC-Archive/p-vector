@@ -171,7 +171,7 @@ def gen_release(db, branch_name: str,
     r = r_template.copy()
 
     r['Architectures'] = ' '.join(sorted(
-        set.union(*map(set, meta_data_list.values()))))
+        set.union(*map(set, meta_data_list.values())))) if meta_data_list else 'all'
     r['Components'] = ' '.join(sorted(component_name_list))
     hash_list = []
     for c in meta_data_list:
