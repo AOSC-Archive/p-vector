@@ -25,7 +25,7 @@ FILETYPES = {
     0o010000: 'fifo',
 }
 
-BRANCHES = ('stable', 'stable-proposed', 'testing', 'explosive')
+BRANCHES = ('stable', 'stable-proposed', 'testing', 'testing-proposed', 'explosive')
 
 def split_soname(s: str):
     spl = s.rsplit('.so', 1)
