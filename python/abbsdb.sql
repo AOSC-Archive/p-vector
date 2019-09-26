@@ -34,13 +34,14 @@ UNIQUE (package, tree, category, section, directory)
 CREATE TABLE IF NOT EXISTS package_versions (
 package TEXT,
 branch TEXT,
+architecture TEXT,
 version TEXT,
 release TEXT,
 epoch TEXT,
 commit_time INTEGER,
 committer TEXT,
 githash TEXT,
-PRIMARY KEY (package, branch)
+PRIMARY KEY (package, branch, architecture)
 );
 CREATE TABLE IF NOT EXISTS package_spec (
 package TEXT,
@@ -54,8 +55,9 @@ package TEXT,
 dependency TEXT,
 relop TEXT,
 version TEXT,
+architecture TEXT,
 relationship TEXT,
-PRIMARY KEY (package, dependency, relationship)
+PRIMARY KEY (package, dependency, architecture, relationship)
 -- FOREIGN KEY(package) REFERENCES packages(name)
 );
 CREATE TABLE IF NOT EXISTS dpkg_repo_stats (
