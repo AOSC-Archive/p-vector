@@ -8,9 +8,9 @@ Multi repository, finding potential file collisions, checking shared object comp
 
 ## Dependencies
 - Python 3
-- OpenSSL (libcrypto)
-- LibArchive
-- (Python 3) psycopg2
+- OpenSSL (libcrypto) (`libssl-dev` in Debian 10)
+- LibArchive (`libarchive-dev` in Debian 10)
+- (Python 3) psycopg2, zmq
 
 And you need a PostgreSQL server. You may deploy one on your local machine.
 
