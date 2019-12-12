@@ -25,8 +25,6 @@ FILETYPES = {
     0o010000: 'fifo',
 }
 
-BRANCHES = ('stable', 'stable-proposed', 'testing', 'testing-proposed', 'explosive')
-
 def split_soname(s: str):
     spl = s.rsplit('.so', 1)
     if len(spl) == 1:
@@ -98,7 +96,7 @@ def scan_deb(args):
 dpkg_vercomp_key = functools.cmp_to_key(
     internal_dpkg_version.dpkg_version_compare)
 
-def scan_dir(db, base_dir: str, branch: str, component: str):
+def scan_dir(db, base_dir: str, branch: str, component: str, branch_idx: int):
     pool_path = PosixPath(base_dir).joinpath('pool')
     search_path = pool_path.joinpath(branch).joinpath(component)
     compname = '%s-%s' % (branch, component)
@@ -172,7 +170,7 @@ def scan_dir(db, base_dir: str, branch: str, component: str):
             repo = '%s/%s' % (realname, branch)
             cur.execute("INSERT INTO pv_repos VALUES (%s,%s,%s,%s,%s,%s,%s,now()) "
                 "ON CONFLICT DO NOTHING",
-                (repo, realname, comppath, BRANCHES.index(branch),
+                (repo, realname, comppath, branch_idx,
                 branch, component, pkginfo['architecture']))
             modified_repo.add(repo)
             pkginfo['repo'] = repo
@@ -251,7 +249,7 @@ def table_mtime(db):
     cur.close()
     return result
 
-def scan(db, base_dir: str):
+def scan(db, base_dir: str, branch_list: list):
     pool_dir = base_dir + '/pool'
     internal_db.init_db(db)
     lastmtime = table_mtime(db)
@@ -259,6 +257,7 @@ def scan(db, base_dir: str):
         if not i.is_dir():
             continue
         branch_name = i.name
+        branch_idx = branch_list.index(branch_name)
         logger_scan.info('Branch: %s', branch_name)
         for j in PosixPath(pool_dir).joinpath(branch_name).iterdir():
             if not j.is_dir():
@@ -266,7 +265,7 @@ def scan(db, base_dir: str):
             component_name = j.name
             logger_scan.info('==== %s-%s ====', branch_name, component_name)
             try:
-                scan_dir(db, base_dir, branch_name, component_name)
+                scan_dir(db, base_dir, branch_name, component_name, branch_idx)
             finally:
                 db.commit()
     refresh = (table_mtime(db) > lastmtime)

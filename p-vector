@@ -2,6 +2,7 @@
 import os
 import sys
 import logging
+import collections
 
 import yaml
 import psycopg2
@@ -19,7 +20,7 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
 
 conf_common = None
-conf_branches = {}
+conf_branches = collections.OrderedDict()
 
 def usage():
     print('Usage: %s CONF (scan|release|sync|analyze|reset)' % sys.argv[0], file=sys.stderr)
@@ -50,7 +51,7 @@ def main():
         if 'zmq_change' in conf_common:
             module_ipc.zmq_change = conf_common['zmq_change']
         module_ipc.init()
-        module_scan.scan(db, base_dir)
+        module_scan.scan(db, base_dir, list(conf_branches.keys()))
     elif action == 'release':
         force = (len(action_args) == 1 and action_args[0] == '--force')
         module_release.generate(db, base_dir, conf_common, conf_branches, force)
