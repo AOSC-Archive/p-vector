@@ -139,7 +139,7 @@ GPG_MAIN = os.environ.get('GPG', shutil.which('gpg2')) or shutil.which('gpg')
 def gen_release(db, branch_name: str,
                 component_name_list: list, dist_dir: str, conf: dict):
     branch_dir = PosixPath(dist_dir).joinpath(branch_name)
-    if not branch_dir.exists():
+    branch_dir.mkdir(0o755, parents=True, exist_ok=True)
         return
 
     cur = db.cursor()
