@@ -204,6 +204,20 @@ def gen_release(db, branch_name: str,
                         })
                     else:
                         has_contents = True
+
+    null_name = 'placeholder'
+    null_path = branch_dir.joinpath(null_name)
+    if len(hash_list) == 0:
+        open(null_path, 'wb').close()  # touch an empty file
+        hash_list.append({
+            'sha256': sha256_file(str(null_path)),
+            'size': 0,
+            'name': null_name
+        })
+    else:
+        if os.path.exists(str(null_path)):
+            os.remove(str(null_path))
+
     hash_list.sort(key=lambda x: x['name'])
     r['SHA256'] = hash_list
     release_fn = branch_dir.joinpath('Release')
