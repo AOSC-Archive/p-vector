@@ -140,7 +140,6 @@ def gen_release(db, branch_name: str,
                 component_name_list: list, dist_dir: str, conf: dict):
     branch_dir = PosixPath(dist_dir).joinpath(branch_name)
     branch_dir.mkdir(0o755, parents=True, exist_ok=True)
-        return
 
     cur = db.cursor()
     meta_data_list = dict.fromkeys(component_name_list)
