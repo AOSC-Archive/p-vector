@@ -20,7 +20,7 @@ TABLES = (
         "upstream_status", "package_upstream", "anitya_link", "anitya_projects"
     )),
 )
-SRCREPOS = ("aosc-os-core", "aosc-os-abbs", "aosc-os-arm-bsps")
+SRCREPOS = ("aosc-os-abbs", "aosc-os-arm-bsps")
 MARKS_TABLES = (
     "marks", "committers", "package_rel", "package_basherr", "branches")
 MARKS_DB_SFX = "-marks.db"
