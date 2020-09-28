@@ -273,7 +273,7 @@ def scan(db, base_dir: str, branch_list: list):
                 scan_dir(db, base_dir, branch_name, component_name, branch_idx)
             finally:
                 db.commit()
-    if len(branch_list) > 0:
+    if branch_list:
         logger_scan.warning("Branches skipped as they are missing on disk: %s", " ".join(branch_list))
     refresh = (table_mtime(db) > lastmtime)
     internal_db.init_index(db, refresh)

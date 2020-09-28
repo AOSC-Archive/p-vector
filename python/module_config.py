@@ -2,9 +2,15 @@ import logging
 import sys
 from pathlib import PosixPath
 
+from typing import Mapping, Any
+
 logger_conf = logging.getLogger('CONF')
 
-def normalize_branch(conf_common: dict, conf_branch: dict):
+PVConf = Mapping[str, Any]
+BranchesConf = Mapping[str, Mapping[str, Any]]
+
+
+def normalize_branch(conf_common: PVConf, conf_branch: PVConf) -> None:
     """ Populate missing config values in branch from default values
         String substitution is allowed within string typed keys, namely suite and desc:
             %BRANCH% will be replaced with the branch name
@@ -22,7 +28,7 @@ def normalize_branch(conf_common: dict, conf_branch: dict):
             conf_branch[key] = conf_common[key]
 
 
-def populate_branches(conf_common: dict, conf_branches: dict):
+def populate_branches(conf_common: PVConf, conf_branches: BranchesConf) -> None:
     """ Automatically create branches with directories on disk """
     pool_dir = conf_common['path'] + '/pool'
     for i in PosixPath(pool_dir).iterdir():
@@ -32,12 +38,11 @@ def populate_branches(conf_common: dict, conf_branches: dict):
         if branch_name in conf_branches.keys():
             # Do not touch ones already in YAML
             continue
-        else:
-            conf_branches[branch_name] = {"branch": branch_name}
+        conf_branches[branch_name] = {"branch": branch_name}
 
 
-def normalize(conf_common: dict, conf_branches: dict):
-    if "populate" in conf_common.keys() and conf_common["populate"]:
+def normalize(conf_common: PVConf, conf_branches: BranchesConf) -> None:
+    if conf_common.get("populate", False):
         populate_branches(conf_common, conf_branches)
     for conf_branch in conf_branches.values():
         normalize_branch(conf_common, conf_branch)
