@@ -1,17 +1,17 @@
 db_pgconn: dbname=packages
 zmq_change: ipc:///tmp/p-vector-changes
 path: /mirror/debs
+populate: true
 origin: AOSC
+ttl: 14
 label: AOSC OS
 codename: Fsck
 ---
 branch: stable
 desc: AOSC OS Repository - Stable
-ttl: 14
 ---
 branch: stable-proposed
 desc: AOSC OS Repository - Stable (Proposed/Candidate Updates)
-ttl: 14
 ---
 branch: testing
 desc: AOSC OS Repository - Testing
