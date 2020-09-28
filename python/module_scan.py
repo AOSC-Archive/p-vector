@@ -257,7 +257,11 @@ def scan(db, base_dir: str, branch_list: list):
         if not i.is_dir():
             continue
         branch_name = i.name
-        branch_idx = branch_list.index(branch_name)
+        try:
+            branch_idx = branch_list.index(branch_name)
+        except ValueError as e:
+            logger_scan.warn('Skipping %s as it is not specified in configuration', branch_name)
+            continue
         logger_scan.info('Branch: %s', branch_name)
         for j in PosixPath(pool_dir).joinpath(branch_name).iterdir():
             if not j.is_dir():
