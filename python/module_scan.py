@@ -257,7 +257,12 @@ def scan(db, base_dir: str, branch_list: list):
         if not i.is_dir():
             continue
         branch_name = i.name
-        branch_idx = branch_list.index(branch_name)
+        try:
+            branch_idx = branch_list.index(branch_name)
+            branch_list.remove(branch_name)
+        except ValueError as e:
+            logger_scan.warning('Skipping %s as it is not specified in configuration', branch_name)
+            continue
         logger_scan.info('Branch: %s', branch_name)
         for j in PosixPath(pool_dir).joinpath(branch_name).iterdir():
             if not j.is_dir():
@@ -268,6 +273,8 @@ def scan(db, base_dir: str, branch_list: list):
                 scan_dir(db, base_dir, branch_name, component_name, branch_idx)
             finally:
                 db.commit()
+    if branch_list:
+        logger_scan.warning("Branches skipped as they are missing on disk: %s", " ".join(branch_list))
     refresh = (table_mtime(db) > lastmtime)
     internal_db.init_index(db, refresh)
     #db.execute('ANALYZE')

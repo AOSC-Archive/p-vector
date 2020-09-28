@@ -14,6 +14,7 @@ import module_ipc
 import module_scan
 import module_sync
 import module_release
+import module_config
 
 logging.basicConfig(
     format='%(asctime)s %(levelname).1s [%(name)5.5s] %(message)s',
@@ -35,13 +36,15 @@ def main():
     action_args = sys.argv[3:]
 
     with open(conf_file, 'rb') as f:
-        y = yaml.load_all(f)
+        y = yaml.safe_load_all(f)
         global conf_common, conf_branches
         conf_common = next(y)
         for i in y:
             if i is None:
                 continue
             conf_branches[i['branch']] = i
+
+    module_config.normalize(conf_common, conf_branches)
 
     db = psycopg2.connect(conf_common['db_pgconn'],
                           cursor_factory=psycopg2.extras.DictCursor)
