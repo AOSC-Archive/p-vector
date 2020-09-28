@@ -35,7 +35,7 @@ def main():
     action_args = sys.argv[3:]
 
     with open(conf_file, 'rb') as f:
-        y = yaml.load_all(f)
+        y = yaml.safe_load_all(f)
         global conf_common, conf_branches
         conf_common = next(y)
         for i in y:
