@@ -2,3 +2,11 @@
 /cmake-build-debug/
 /build/
 /.*/
+
+# Editor tempporaries
+*.swp
+*~
+
+# Python cache
+__pycache__
+*.pyc
