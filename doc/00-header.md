@@ -3,7 +3,9 @@ link-citations: true
 title: 'p-vector(1) User Guide and Documentation'
 reference-section-title: "References"
 author:
-  - Tianhao Chai `<cth451@gmail.com>`
+  - Tianhao Chai <cth451@gmail.com>
+  - Dingyuan Wang <gumblex@aosc.io>
+  - Lion Yang <lion@aosc.io>
 date: September 29, 2020
 header-includes:
   - \hypersetup{colorlinks=true}
@@ -17,7 +19,7 @@ header-includes:
       \let\Begin\begin
       \let\End\end
     }
-documentclass: report
+documentclass: article
 geometry:
   - margin=1in
 ---
