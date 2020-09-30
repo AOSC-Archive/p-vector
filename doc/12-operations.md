@@ -8,15 +8,15 @@
 
 *`release [--force]`*
 :   Generate APT repository assets, and apply PGP signature.
-:   APT assets generated include `InRelease` for each branch, `Contents-$ARCH`, `Pacakges` and `Packages.xz` for each branch-architecture combination and their PGP-signed parts.
-:   Data used for asset generation are obtained from the database, not the `deb` packages. If data for a certain branch - architecture combination has not been updated on the database since last time APT assets were generated, `p-vector` will not regenerate assets for that branch-architecture to preserve synchronization bandwith. However, you can force `p-vector` to regenerate and re-sign assets with the *`--force`* option.
+:   APT assets generated include `InRelease` for each branch, `Contents-$ARCH`, `Pacakges` and `Packages.xz` for each branch-component-architecture combination and their PGP-signed parts.
+:   Data used for asset generation are obtained from the database, not the `deb` packages. If data for a certain branch-component-architecture combination has not been updated on the database since last time APT assets were generated, `p-vector` will not regenerate assets for that branch-component-architecture to reduce write traffic to disk. However, the *`--force`* option will cause `p-vector` to regenerate and re-sign assets.
 
 *`sync`*
 :   Synchronize main repository data to local database from AOSC servers.
-:   The data aid the dependency analyzer in finding potential packaging quality issues or breakage. This is not required for creating and publishing a working APT repository.
+:   The data aid the dependency analyzer to find potential packaging quality issues or breakage. This is not required for creating and publishing a working APT repository.
 
 *`analyze`*
-:   Analyze potential issues for the current repository state and store them in the database. In addition to directly querying the database, a set of utilities can be used to build a web frontend to the database. See [AOSC Wiki Page on Packages Site](https://wiki.aosc.io/developer/infrastructure/packages-site/) for more information. An offical instance to query main AOSC repository is currently hosted at <https://packages.aosc.io>.
+:   Analyze potential issues for the current repository state and store them in the database. In addition to directly querying the database, a set of utilities can be used to build a web frontend to the database. See [AOSC Wiki Page on Packages Site](https://wiki.aosc.io/developer/infrastructure/packages-site/) for more information. An official instance to query main AOSC repository is currently hosted at <https://packages.aosc.io>.
 
 *`reset table_category`*
 :   Drops data from the database.

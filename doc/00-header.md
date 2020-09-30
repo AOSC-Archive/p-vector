@@ -13,12 +13,14 @@ header-includes:
   - \setlength\parindent{2em}
   - \usepackage{float}
   - \usepackage{listings}
-  - \lstset{frame=shadowbox,basicstyle=\ttfamily,breaklines=true,numbers=left,stepnumber=1,rulesepcolor=\color{gray}}
+  - \lstset{frame=shadowbox,basicstyle=\ttfamily,breaklines=true,rulesepcolor=\color{gray}}
   - \newcommand{\hideFromPandoc}[1]{#1}
   - \hideFromPandoc{
       \let\Begin\begin
       \let\End\end
     }
+  - \let\oldfootnote\footnote
+  - \renewcommand\footnote[1]{\oldfootnote{\hspace{1.5mm}#1}}
 documentclass: article
 geometry:
   - margin=1in

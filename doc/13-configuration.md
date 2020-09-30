@@ -34,10 +34,12 @@ desc: "Cooked Jelly for %BRANCH%"
 Here we explain the global parameters that affects `p-vector` itself:
 
 *`db_pgconn`*
-:   Accepts a string _`db_name=<fill name of db here>`_. This is the PostgreSQL database where `p-vector` stores package metadata. The database must exist and the invoking user must have read-write permission to the database.
+:   Accepts a set of connection parameters in the form of a PostgreSQL connection string[^connstring]. This specifies the PostgreSQL database where `p-vector` stores package metadata. The database must exist and the invoking user must have read-write permission to the database. For local usage, single _`dbname=blah`_ should be enough.
+
+[^connstring]: See [PostgreSQL Documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING) on how to specify a database connection.
 
 *`path`*
-:   Accepts a path where `p-vector` will search for `deb` packages and place generated APT assets. See **[REPOSITORY STRUCTURE](#repository structure)** section for more information.
+:   Accepts a path where `p-vector` will search for `deb` packages and place generated APT assets. See **[REPOSITORY STRUCTURE](#repository-structure)** section for more information.
 
 *`zmq_change`*
 :   The ZeroMQ IPC endpoint via which `p-vector` will send notification about packages updated after each scan. The message itself consists of key-value pairs in JSON representation as the following. Another program may listen on the endpoint to execute actions when packages are added, updated or deleted. This parameter is optional.
@@ -54,7 +56,7 @@ Here we explain the global parameters that affects `p-vector` itself:
 ```
 
 *`populate`*
-:   Accepts a boolean value. This parameter controls whether `p-vector` should implicitly treat all directories under `$PATH/pool` as an APT branch. See **[REPOSITORY STRUCTURE](#repository structure)** section for more information.
+:   Accepts a boolean value. This parameter controls whether `p-vector` should implicitly treat all directories under `$PATH/pool` as an APT branch. See **[REPOSITORY STRUCTURE](#repository-structure)** section for more information.
 
 
 ```{caption="Configuration file: Per-branch sections"}
