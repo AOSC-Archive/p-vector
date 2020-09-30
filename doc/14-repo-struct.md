@@ -12,10 +12,10 @@
         pool/$BRANCH/$COMPONENT/libc/libc_1.0.0-0_amd64.deb
 
 *`dist/$BRANCH`*
-:   For every branch `p-vector` has scanned, this directory with the same name is generated to hold APT readable metadata for this branch.
+:   For every branch scanned, `p-vector` populates a directory with the same name with APT readable metadata for this branch.
 
 *`dist/$BRANCH/InRelease`*
-:   A PGP clear signed text containing the general information about the branch and checksums of other APT metadata files.
+:   A PGP clear signed text with the general information about the branch and checksums of other APT metadata files.
 
 *`dist/$BRANCH/$COMPONENT/Contents-$ARCHITECTURE.gz`*
 :   Gzipped list of mapping from a path to the section-package that provides this path.
