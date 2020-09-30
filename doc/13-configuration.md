@@ -1,10 +1,10 @@
 ### Configuration
 
-A single `p-vector` instance manages exactly one APT pool and one dist directory. An instance of `p-vector` consists of a configuration YAML and a PostgreSQL database.
+A single `p-vector` instance manages exactly one APT pool and one dist directory. A `p-vector` instance operates off of a configuration YAML and a PostgreSQL database.
 
 ##### PostgreSQL
 
-You will need a PostgreSQL database for `p-vector` to retain its state information about the APT repository and packages. Assuming `p-vector` is installed to `/usr/bin/p-vector`, run the following in your shell to bootstrap a database for use with `p-vector`:
+You will need a PostgreSQL database for `p-vector` to retain its state information about managed APT repository and packages. Assuming `p-vector` is installed at `/usr/bin/p-vector`, run the following in your shell to bootstrap a database for use with `p-vector`:
 
 ```{caption="Bootstrapping database"}
 psql $DB_NAME < /usr/libexec/p-vector/abbsdb.sql
@@ -31,18 +31,18 @@ desc: "Cooked Jelly for %BRANCH%"
  ... branch specific parameters ...
 ```
 
-Here we explain the global parameters that affects `p-vector` itself:
+Here below we explain the global parameters that affects `p-vector` itself:
 
 *`db_pgconn`*
-:   Accepts a set of connection parameters in the form of a PostgreSQL connection string[^connstring]. This specifies the PostgreSQL database where `p-vector` stores package metadata. The database must exist and the invoking user must have read-write permission to the database. For local usage, single _`dbname=blah`_ should be enough.
+:   Accepts a set of connection parameters in the form of a PostgreSQL connection string[^connstring]. This specifies the PostgreSQL database in which `p-vector` stores package metadata. The database must exist and the invoking user must have read-write permission to that database. For local usage, a single _`dbname=foo`_ should be enough.
 
-[^connstring]: See [PostgreSQL Documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING) on how to specify a database connection.
+[^connstring]: See [PostgreSQL Documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING) on how to reference a database connection.
 
 *`path`*
-:   Accepts a path where `p-vector` will search for `deb` packages and place generated APT assets. See **[REPOSITORY STRUCTURE](#repository-structure)** section.
+:   Accepts a path where `p-vector` will search for `deb` packages and place generated APT assets. See the **[REPOSITORY STRUCTURE](#repository-structure)** section for details.
 
 *`zmq_change`*
-:   The ZeroMQ IPC endpoint via which `p-vector` will send notifications about packages updated after each scan. Another program may listen on the endpoint to execute actions when packages are added, updated or deleted. This parameter is optional.
+:   The ZeroMQ IPC endpoint via which `p-vector` will send notifications about packages updates after each scan. Another program may listen on the endpoint to execute actions when packages are added, updated or deleted. This parameter is optional.
 
 ```{caption="ZeroMQ IPC Format"}
 {
@@ -56,8 +56,7 @@ Here we explain the global parameters that affects `p-vector` itself:
 ```
 
 *`populate`*
-:   Accepts a boolean value. This parameter controls whether `p-vector` should implicitly treat all directories under `$PATH/pool` as an APT branch. See **[REPOSITORY STRUCTURE](#repository-structure)** section.
-
+:   Accepts a boolean value. This parameter controls whether `p-vector` should implicitly treat all directories under `$PATH/pool` as an APT branch. See the **[REPOSITORY STRUCTURE](#repository-structure)** section for details.
 
 ```{caption="Configuration file: Per-branch sections"}
  ... global parameters ...
@@ -70,7 +69,6 @@ desc: "testing"
 ---
  ... more branch specific parameters if needed ...
 ```
-
 After the global section come parameters for each branch. Each branch corresponds to a release as defined in the Debian Repository Format[^deb].
 
 *`branch_name`*
@@ -91,11 +89,11 @@ The following parameters can be either placed in the global section as default v
 :   This value is used to derive _`Valid-Until`_ field together with _`Date`_ in generated _`InRelease`_ files.
 
 *`codename`*
-:   A one-word development codename for the software release, used as the _`Codename`_ field in _`InRelease`_.
+:   A development codename for the software release, used as the _`Codename`_ field in _`InRelease`_.
 
 *`origin`*
 :   A one-line phrase indicating the origin of the APT sources, used as the _`Origin`_ field in _`InRelease`_.
 
 AOSC OS repository only has one component: _`main`_. Other fields in the Debian Repository Format are not supported for now, but may be added in the future.
 
-[^deb]: [Structure of the official Debian repository](https://wiki.debian.org/DebianRepository/Format). AOSC does not strictly adhere to this structure, but this is retained for reference nonetheless. 
+[^deb]: [Structure of the official Debian repository](https://wiki.debian.org/DebianRepository/Format). AOSC does not strictly adhere to this structure, here this ispresented for reference purposes. 
