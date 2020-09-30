@@ -96,4 +96,4 @@ The following parameters can be either placed in the global section as default v
 
 AOSC OS repository only has one component: _`main`_. Other fields in the Debian Repository Format are not supported for now, but may be added in the future.
 
-[^deb]: [Structure of the official Debian repository](https://wiki.debian.org/DebianRepository/Format). AOSC does not strictly adhere to this structure, here this ispresented for reference purposes. 
+[^deb]: [Structure of the official Debian repository](https://wiki.debian.org/DebianRepository/Format). AOSC does not strictly adhere to this structure, here this is presented for reference purposes. 
