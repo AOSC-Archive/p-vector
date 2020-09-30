@@ -11,7 +11,7 @@ header-includes:
   - \setlength\parindent{2em}
   - \usepackage{float}
   - \usepackage{listings}
-  - \lstset{basicstyle=\small\ttfamily,breaklines=true,numbers=left,stepnumber=1}
+  - \lstset{frame=shadowbox,basicstyle=\ttfamily,breaklines=true,numbers=left,stepnumber=1,rulesepcolor=\color{gray}}
   - \newcommand{\hideFromPandoc}[1]{#1}
   - \hideFromPandoc{
       \let\Begin\begin
