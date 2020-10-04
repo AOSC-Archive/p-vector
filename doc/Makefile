@@ -16,3 +16,9 @@ p-vector.1.xz: p-vector.1
 
 p-vector.commonmark: $(MD)
 	$(MD2CM) -o $@ $(MD)
+
+clean:
+	rm -f p-vector.pdf
+	rm -f p-vector.1
+	rm -f p-vector.1.xz
+	rm -f p-vector.commonmark
