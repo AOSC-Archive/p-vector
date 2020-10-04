@@ -1,6 +1,6 @@
 ---
 link-citations: true
-title: 'p-vector(1) User Guide and Documentation'
+title: 'p-vector(1) User Manual'
 reference-section-title: "References"
 author:
   - Mingcong Bai <jeffbai@aosc.io>

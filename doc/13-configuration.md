@@ -1,8 +1,8 @@
-### Configuration
+# Configuration
 
 A single `p-vector` instance manages exactly one APT pool and one dist directory. A `p-vector` instance operates off of a configuration YAML and a PostgreSQL database.
 
-##### PostgreSQL
+### PostgreSQL
 
 You will need a PostgreSQL database for `p-vector` to retain its state information about managed APT repository and packages. Assuming `p-vector` is installed at `/usr/bin/p-vector`, run the following in your shell to bootstrap a database for use with `p-vector`:
 
@@ -11,7 +11,7 @@ psql $DB_NAME < /usr/libexec/p-vector/abbsdb.sql
 psql $DB_NAME < /usr/libexec/p-vector/vercomp.sql
 ```
 
-##### YAML
+### YAML
 
 The YAML _file_ should contain at least one or more YAML _sections_, with the first YAML section containing global parameters. For instance:
 
@@ -94,6 +94,6 @@ The following parameters can be either placed in the global section as default v
 *`origin`*
 :   A one-line phrase indicating the origin of the APT sources, used as the _`Origin`_ field in _`InRelease`_.
 
-AOSC OS repository only has one component: _`main`_. Other fields in the Debian Repository Format are not supported for now, but may be added in the future.
+AOSC OS repository only has one component: _`main`_. Other fields in the Debian Repository Format are left empty for now, but support for them may be added in the future.
 
-[^deb]: [Structure of the official Debian repository](https://wiki.debian.org/DebianRepository/Format). AOSC does not strictly adhere to this structure, here this is presented for reference purposes. 
+[^deb]: [Structure of the official Debian repository](https://wiki.debian.org/DebianRepository/Format). AOSC does not strictly adhere to this structure. Here this resource is presented for reference purposes. 
