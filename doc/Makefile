@@ -12,7 +12,7 @@ p-vector.1: $(MD)
 	$(MD2MAN) -o $@ $(MD)
 
 p-vector.1.xz: p-vector.1
-	xz -z --keep $^
+	xz -c --keep $^ > $@
 
 p-vector.commonmark: $(MD)
 	$(MD2CM) -o $@ $(MD)
