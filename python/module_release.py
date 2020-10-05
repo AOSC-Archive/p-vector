@@ -9,10 +9,12 @@ from pathlib import PosixPath, PurePath
 import deb822
 import internal_db
 from internal_pkgscan import sha256_file, size_sha256_fp
+from module_config import PVConf, BranchesConf
 
 logger_rel = logging.getLogger('REL')
 
-def generate(db, base_dir: str, conf_common: dict, conf_branches: dict, force: bool):
+
+def generate(db, base_dir: str, conf_common: PVConf, conf_branches: BranchesConf, force: bool):
     dist_dir = base_dir + '/dists.new'
     pool_dir = base_dir + '/pool'
     dist_dir_real = base_dir + '/dists'
@@ -136,8 +138,9 @@ def gen_contents(db, branch_name: str, component_name: str, dist_dir: str):
 
 GPG_MAIN = os.environ.get('GPG', shutil.which('gpg2')) or shutil.which('gpg')
 
+
 def gen_release(db, branch_name: str,
-                component_name_list: list, dist_dir: str, conf: dict):
+                component_name_list: list, dist_dir: str, conf: PVConf):
     branch_dir = PosixPath(dist_dir).joinpath(branch_name)
     branch_dir.mkdir(0o755, parents=True, exist_ok=True)
 
