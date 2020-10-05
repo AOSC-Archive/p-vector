@@ -24,7 +24,7 @@ def get_valid_until_from_release(inrel: PosixPath) -> float:
             if result:
                 timestamp = datetime.strptime(result.group("timestamp"), date_format)
                 return timestamp.timestamp()
-    # This should be unreachable, but placed to guard against accidentals
+    # In case TTL was unspecified last time, return 0 to always enforce regen
     return 0
 
 
@@ -33,7 +33,6 @@ def generate(db, base_dir: str, conf_common: PVConf, conf_branches: BranchesConf
     pool_dir = base_dir + '/pool'
     dist_dir_real = base_dir + '/dists'
     dist_dir_old = base_dir + '/dists.old'
-    expire_renewal_period = timedelta(days=conf_common.get("renew_in", 1)).total_seconds()
     shutil.rmtree(dist_dir, ignore_errors=True)
     for i in PosixPath(pool_dir).iterdir():
         if not i.is_dir():
@@ -41,6 +40,7 @@ def generate(db, base_dir: str, conf_common: PVConf, conf_branches: BranchesConf
         branch_name = i.name
         realbranchdir = os.path.join(dist_dir_real, branch_name)
         inrel = PosixPath(realbranchdir).joinpath('InRelease')
+        expire_renewal_period = timedelta(days=conf_branches[branch_name].get("renew_in", 1)).total_seconds()
         if not force and inrel.is_file():
             # See if we can skip this branch altogether
             inrel_mtime = inrel.stat().st_mtime
