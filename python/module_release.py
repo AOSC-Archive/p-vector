@@ -2,48 +2,69 @@ import os
 import gzip
 import shutil
 import logging
-import datetime
+import re
+from datetime import datetime, timezone, timedelta
 import subprocess
 from pathlib import PosixPath, PurePath
 
 import deb822
 import internal_db
 from internal_pkgscan import sha256_file, size_sha256_fp
+from module_config import PVConf, BranchesConf
 
 logger_rel = logging.getLogger('REL')
+date_format = '%a, %d %b %Y %H:%M:%S %z'
+valid_until_line_matcher = re.compile("Valid-Until: (?P<timestamp>.+)")
 
-def generate(db, base_dir: str, conf_common: dict, conf_branches: dict, force: bool):
+
+def get_valid_until_from_release(inrel: PosixPath) -> float:
+    with open(inrel, 'r') as in_release:
+        for line in in_release:
+            result = valid_until_line_matcher.match(line)
+            if result:
+                timestamp = datetime.strptime(result.group("timestamp"), date_format)
+                return timestamp.timestamp()
+    # In case TTL was unspecified last time, return 0 to always enforce regen
+    return 0
+
+
+def generate(db, base_dir: str, conf_common: PVConf, conf_branches: BranchesConf, force: bool):
     dist_dir = base_dir + '/dists.new'
     pool_dir = base_dir + '/pool'
     dist_dir_real = base_dir + '/dists'
     dist_dir_old = base_dir + '/dists.old'
     shutil.rmtree(dist_dir, ignore_errors=True)
-    for i in PosixPath(pool_dir).iterdir():
+    for key in conf_branches.keys():
+        i = PosixPath(pool_dir).joinpath(key)
         if not i.is_dir():
             continue
         branch_name = i.name
         realbranchdir = os.path.join(dist_dir_real, branch_name)
         inrel = PosixPath(realbranchdir).joinpath('InRelease')
-        skip = False
+        expire_renewal_period = timedelta(days=conf_branches[branch_name].get("renew_in", 1)).total_seconds()
         if not force and inrel.is_file():
-            mtime = inrel.stat().st_mtime - 900
+            # See if we can skip this branch altogether
+            inrel_mtime = inrel.stat().st_mtime
+            inrel_sec_to_expire = get_valid_until_from_release(inrel) - datetime.now().timestamp()
             cur = db.cursor()
             cur.execute("SELECT coalesce(extract(epoch FROM max(mtime)), 0) "
                 "FROM pv_repos WHERE branch=%s", (branch_name,))
-            result = cur.fetchone()[0]
+            db_mtime = cur.fetchone()[0]
             cur.close()
-            if result and mtime > result:
+            # Skip if
+            # -   P-vector does not recognize this branch (usually means branch is empty)
+            # OR  On-disk release mtime is newer than last time db was updated
+            # AND On-disk release won't expire in 1 day
+            if not db_mtime or inrel_mtime > db_mtime and inrel_sec_to_expire > expire_renewal_period:
                 shutil.copytree(realbranchdir, os.path.join(dist_dir, branch_name))
                 logger_rel.info('Skip generating Packages and Contents for %s', branch_name)
-                skip = True
+                continue
         component_name_list = []
         for j in PosixPath(pool_dir).joinpath(branch_name).iterdir():
             if not j.is_dir():
                 continue
             component_name = j.name
             component_name_list.append(component_name)
-            if skip:
-                continue
             logger_rel.info('Generating Packages for %s-%s', branch_name, component_name)
             gen_packages(db, dist_dir, branch_name, component_name)
             logger_rel.info('Generating Contents for %s-%s', branch_name, component_name)
@@ -136,8 +157,9 @@ def gen_contents(db, branch_name: str, component_name: str, dist_dir: str):
 
 GPG_MAIN = os.environ.get('GPG', shutil.which('gpg2')) or shutil.which('gpg')
 
+
 def gen_release(db, branch_name: str,
-                component_name_list: list, dist_dir: str, conf: dict):
+                component_name_list: list, dist_dir: str, conf: PVConf):
     branch_dir = PosixPath(dist_dir).joinpath(branch_name)
     branch_dir.mkdir(0o755, parents=True, exist_ok=True)
 
@@ -159,13 +181,12 @@ def gen_release(db, branch_name: str,
         'Description': conf['desc'],
     }
     r_template = deb822.Release(r_basic_info)
-    date_format = '%a, %d %b %Y %H:%M:%S %z'
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    now = datetime.now(tz=timezone.utc)
     r_template['Date'] = now.strftime(date_format)
     if 'ttl' in conf:
         ttl = int(conf['ttl'])
         r_template['Valid-Until'] = (
-            now + datetime.timedelta(days=ttl)).strftime(date_format)
+            now + timedelta(days=ttl)).strftime(date_format)
 
     r = r_template.copy()
 

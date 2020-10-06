@@ -2,12 +2,15 @@ import logging
 import sys
 from pathlib import PosixPath
 
-from typing import Mapping, Any
+from typing import Dict, Any
 
 logger_conf = logging.getLogger('CONF')
 
-PVConf = Mapping[str, Any]
-BranchesConf = Mapping[str, Mapping[str, Any]]
+PVConf = Dict[str, Any]
+BranchesConf = Dict[str, Dict[str, Any]]
+
+override_keys = ["codename", "desc", "label", "origin", "renew_in", "ttl"]
+required_keys = ["codename", "desc", "label", "origin"]
 
 
 def normalize_branch(conf_common: PVConf, conf_branch: PVConf) -> None:
@@ -15,14 +18,16 @@ def normalize_branch(conf_common: PVConf, conf_branch: PVConf) -> None:
         String substitution is allowed within string typed keys, namely suite and desc:
             %BRANCH% will be replaced with the branch name
     """
-    for key in ["ttl", "desc", "suite"]:
+    for key in override_keys:
         if key in conf_branch.keys():
             continue
-        if key not in conf_common.keys():
+        if key not in conf_common.keys() and key in required_keys:
             logger_conf.fatal(
                 "Missing %s for branch %s which has no global default", key, conf_branch["branch"])
             sys.exit(1)
-        if key != "ttl":
+        if key not in conf_common.keys() and key not in required_keys:
+            continue
+        if key == "desc":
             conf_branch[key] = conf_common[key].replace("%BRANCH%", conf_branch["branch"])
         else:
             conf_branch[key] = conf_common[key]
