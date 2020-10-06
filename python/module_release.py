@@ -34,7 +34,8 @@ def generate(db, base_dir: str, conf_common: PVConf, conf_branches: BranchesConf
     dist_dir_real = base_dir + '/dists'
     dist_dir_old = base_dir + '/dists.old'
     shutil.rmtree(dist_dir, ignore_errors=True)
-    for i in PosixPath(pool_dir).iterdir():
+    for key in conf_branches.keys():
+        i = PosixPath(pool_dir).joinpath(key)
         if not i.is_dir():
             continue
         branch_name = i.name
