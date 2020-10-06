@@ -93,7 +93,7 @@ The following parameters can be either placed in the global section as default v
 :   A one-line phrase indicating the origin of the APT sources, used as the _`Origin`_ field in _`InRelease`_.
 
 *`renew_in`*
-:   The number of days before _`InRelease`_ in which `p-vector` will regenerate APT assets regardless of whether any `deb` packages are added, updated or removed. This parameter is optional and defaults to 1 if left unspecified.
+:   The number of days before _`InRelease`_ expires when `p-vector` will regenerate APT assets regardless of whether any `deb` packages are added, updated or removed. This parameter is optional and defaults to 1 day if left unspecified. Setting this parameter to a value larger than _`ttl`_ will cause `p-vector` to always regenerate APT assets every time during a _`release`_ operation.
 
 *`ttl`*
 :   The number of days before the generated _`InRelease`_ is considered obsolete and outdated by APT.
