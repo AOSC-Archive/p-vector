@@ -67,6 +67,8 @@ def main():
         arg = action_args[0]
         assert input("Please confirm to reset tables for %s [YES]: " % arg) == 'YES'
         internal_db.drop_tables(db, arg)
+    elif action == 'gc':
+        module_config.run_gc(db)
     else:
         usage()
 

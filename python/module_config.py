@@ -2,7 +2,7 @@ import logging
 import sys
 from pathlib import PosixPath
 
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 logger_conf = logging.getLogger('CONF')
 
@@ -51,3 +51,15 @@ def normalize(conf_common: PVConf, conf_branches: BranchesConf) -> None:
         populate_branches(conf_common, conf_branches)
     for conf_branch in conf_branches.values():
         normalize_branch(conf_common, conf_branch)
+
+
+def list_seen_repo(db) -> List[str]:
+    ret = []
+    cur = db.cursor()
+    result = cur.execute("SELECT DISTINCT branch FROM pv_repos")
+    cur.close()
+    return ret
+
+
+def run_gc(db) -> None:
+    pass
