@@ -126,7 +126,7 @@ def init_db(db):
                 '_vercomp TEXT,'
                 'PRIMARY KEY (package, version, repo),'
                 'CONSTRAINT fkey_repo FOREIGN KEY (repo)'
-                'REFERENCES pv_repos (name) ON DELETE CASCADE'
+                'REFERENCES pv_repos (name) ON DELETE CASCADE INITIALLY DEFERRED'
                 ')')
     cur.execute('UPDATE pv_repos r SET mtime=(SELECT to_timestamp(max(mtime)) '
                 'FROM pv_packages p WHERE p.repo=r.name) WHERE mtime IS NULL')
@@ -147,9 +147,9 @@ def init_db(db):
                 '_vercomp TEXT,'
                 'PRIMARY KEY (filename),'
                 'CONSTRAINT fkey_repo FOREIGN KEY (repo)'
-                'REFERENCES pv_repos (name) ON DELETE CASCADE,'
+                'REFERENCES pv_repos (name) ON DELETE CASCADE INITIALLY DEFERRED,'
                 'CONSTRAINT fkey_package FOREIGN KEY (package, version, repo)'
-                'REFERENCES pv_packages (package, version, repo) ON DELETE CASCADE'
+                'REFERENCES pv_packages (package, version, repo) ON DELETE CASCADE INITIALLY DEFERRED'
                 ')')
     cur.execute('CREATE TABLE IF NOT EXISTS pv_package_dependencies ('
                 'package TEXT,'
@@ -159,9 +159,9 @@ def init_db(db):
                 'value TEXT,'
                 'PRIMARY KEY (package, version, repo, relationship),'
                 'CONSTRAINT fkey_repo FOREIGN KEY (repo)'
-                'REFERENCES pv_repos (name) ON DELETE CASCADE,'
+                'REFERENCES pv_repos (name) ON DELETE CASCADE INITIALLY DEFERRED,'
                 'CONSTRAINT fkey_package FOREIGN KEY (package, version, repo)'
-                'REFERENCES pv_packages (package, version, repo) ON DELETE CASCADE'
+                'REFERENCES pv_packages (package, version, repo) ON DELETE CASCADE INITIALLY DEFERRED'
                 ')')
     cur.execute('CREATE TABLE IF NOT EXISTS pv_package_sodep ('
                 'package TEXT,'
@@ -171,9 +171,9 @@ def init_db(db):
                 'name TEXT,'
                 'ver TEXT,'
                 'CONSTRAINT fkey_repo FOREIGN KEY (repo)'
-                'REFERENCES pv_repos (name) ON DELETE CASCADE,'
+                'REFERENCES pv_repos (name) ON DELETE CASCADE INITIALLY DEFERRED,'
                 'CONSTRAINT fkey_package FOREIGN KEY (package, version, repo)'
-                'REFERENCES pv_packages (package, version, repo) ON DELETE CASCADE'
+                'REFERENCES pv_packages (package, version, repo) ON DELETE CASCADE INITIALLY DEFERRED' 
                 # 'PRIMARY KEY (package, version, repo, depends, name)'
                 ')')
     cur.execute('CREATE TABLE IF NOT EXISTS pv_package_files ('
@@ -190,9 +190,9 @@ def init_db(db):
                 'uname TEXT,'
                 'gname TEXT,'
                 'CONSTRAINT fkey_repo FOREIGN KEY (repo)'
-                'REFERENCES pv_repos (name) ON DELETE CASCADE,'
+                'REFERENCES pv_repos (name) ON DELETE CASCADE INITIALLY DEFERRED,'
                 'CONSTRAINT fkey_package FOREIGN KEY (package, version, repo)'
-                'REFERENCES pv_packages (package, version, repo) ON DELETE CASCADE'
+                'REFERENCES pv_packages (package, version, repo) ON DELETE CASCADE INITIALLY DEFERRED'
                 # 'PRIMARY KEY (package, version, repo, path, name)'
                 ')')
     cur.execute('CREATE TABLE IF NOT EXISTS pv_package_issues ('
