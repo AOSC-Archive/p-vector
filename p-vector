@@ -15,6 +15,7 @@ import module_scan
 import module_sync
 import module_release
 import module_config
+import module_gc
 
 logging.basicConfig(
     format='%(asctime)s %(levelname).1s [%(name)5.5s] %(message)s',
@@ -68,7 +69,8 @@ def main():
         assert input("Please confirm to reset tables for %s [YES]: " % arg) == 'YES'
         internal_db.drop_tables(db, arg)
     elif action == 'gc':
-        module_config.run_gc(db)
+        dryrun = (len(action_args) == 1 and action_args[0] == '--dry-run')
+        module_gc.run_gc(db, base_dir, dryrun)
     else:
         usage()
 

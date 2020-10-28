@@ -54,12 +54,8 @@ def normalize(conf_common: PVConf, conf_branches: BranchesConf) -> None:
 
 
 def list_seen_repo(db) -> List[str]:
-    ret = []
     cur = db.cursor()
-    result = cur.execute("SELECT DISTINCT branch FROM pv_repos")
+    cur.execute("SELECT DISTINCT path FROM pv_repos")
+    ret = cur.fetchall()
     cur.close()
-    return ret
-
-
-def run_gc(db) -> None:
-    pass
+    return [item[0] for item in ret]
