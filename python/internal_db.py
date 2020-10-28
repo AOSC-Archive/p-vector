@@ -146,8 +146,6 @@ def init_db(db):
                 'description TEXT,'
                 '_vercomp TEXT,'
                 'PRIMARY KEY (filename),'
-                'CONSTRAINT fkey_repo FOREIGN KEY (repo)'
-                'REFERENCES pv_repos (name) ON DELETE CASCADE INITIALLY DEFERRED,'
                 'CONSTRAINT fkey_package FOREIGN KEY (package, version, repo)'
                 'REFERENCES pv_packages (package, version, repo) ON DELETE CASCADE INITIALLY DEFERRED'
                 ')')
@@ -158,8 +156,6 @@ def init_db(db):
                 'relationship TEXT,'
                 'value TEXT,'
                 'PRIMARY KEY (package, version, repo, relationship),'
-                'CONSTRAINT fkey_repo FOREIGN KEY (repo)'
-                'REFERENCES pv_repos (name) ON DELETE CASCADE INITIALLY DEFERRED,'
                 'CONSTRAINT fkey_package FOREIGN KEY (package, version, repo)'
                 'REFERENCES pv_packages (package, version, repo) ON DELETE CASCADE INITIALLY DEFERRED'
                 ')')
@@ -170,8 +166,6 @@ def init_db(db):
                 'depends INTEGER,' # 0 provides, 1 depends
                 'name TEXT,'
                 'ver TEXT,'
-                'CONSTRAINT fkey_repo FOREIGN KEY (repo)'
-                'REFERENCES pv_repos (name) ON DELETE CASCADE INITIALLY DEFERRED,'
                 'CONSTRAINT fkey_package FOREIGN KEY (package, version, repo)'
                 'REFERENCES pv_packages (package, version, repo) ON DELETE CASCADE INITIALLY DEFERRED' 
                 # 'PRIMARY KEY (package, version, repo, depends, name)'
@@ -189,8 +183,6 @@ def init_db(db):
                 'gid BIGINT,'
                 'uname TEXT,'
                 'gname TEXT,'
-                'CONSTRAINT fkey_repo FOREIGN KEY (repo)'
-                'REFERENCES pv_repos (name) ON DELETE CASCADE INITIALLY DEFERRED,'
                 'CONSTRAINT fkey_package FOREIGN KEY (package, version, repo)'
                 'REFERENCES pv_packages (package, version, repo) ON DELETE CASCADE INITIALLY DEFERRED'
                 # 'PRIMARY KEY (package, version, repo, path, name)'
