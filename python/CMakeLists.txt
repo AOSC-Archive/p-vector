@@ -13,4 +13,5 @@ install(FILES
         vercomp.sql
         abbsdb.sql
         pkgissues.sql
+        foreignkey.sql
         DESTINATION ${LIBEXEC_PATH})
