@@ -156,7 +156,6 @@ def scan_dir(db, base_dir: str, branch: str, component: str, branch_idx: int):
     del ignore_files
     with multiprocessing.dummy.Pool(max(1, os.cpu_count() - 1)) as mpool:
         for pkginfo, depinfo, sodeps, files in mpool.imap_unordered(scan_deb, check_list, 5):
-            cur.execute("BEGIN")
             realname = pkginfo['architecture']
             validdeb = ('debtime' in pkginfo)
             if realname == 'all':
@@ -228,14 +227,16 @@ def scan_dir(db, base_dir: str, branch: str, component: str, branch_idx: int):
                 (keys, qms), vals)
             for row in depinfo.items():
                 cur.execute("INSERT INTO pv_package_dependencies "
-                    "VALUES (%s,%s,%s,%s,%s)", dbkey + row)
+                    "VALUES (%s,%s,%s,%s,%s) "
+                    "ON CONFLICT ON CONSTRAINT pv_package_dependencies_pkey "
+                    "DO UPDATE SET value = %s",
+                    dbkey + row + (row[1],))
             for row in sodeps:
                 cur.execute("INSERT INTO pv_package_sodep VALUES "
                     "(%s,%s,%s,%s,%s,%s)", dbkey + row)
             for row in files:
                 cur.execute("INSERT INTO pv_package_files VALUES "
                     "(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", dbkey + row)
-            cur.execute("COMMIT")
     for repo in modified_repo:
         cur.execute("UPDATE pv_repos SET mtime=now() WHERE name=%s", (repo,))
 
