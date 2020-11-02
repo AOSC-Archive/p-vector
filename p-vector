@@ -25,7 +25,7 @@ conf_common = None
 conf_branches = collections.OrderedDict()
 
 def usage():
-    print('Usage: %s CONF (scan|release|sync|analyze|reset)' % sys.argv[0], file=sys.stderr)
+    print('Usage: %s CONF (scan|release|sync|analyze|reset|gc)' % sys.argv[0], file=sys.stderr)
     sys.exit(1)
 
 def main():
