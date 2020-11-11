@@ -29,8 +29,8 @@ jobs:
       with:
         name: artifacts
         path: |
-          ${{runner.workspace}}/build/*.tar*
-          ${{runner.workspace}}/build/*.deb
+          build/*.tar*
+          build/*.deb
 
 
   release:
