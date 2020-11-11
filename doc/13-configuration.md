@@ -9,6 +9,7 @@ You will need a PostgreSQL database for `p-vector` to retain its state informati
 ```{caption="Bootstrapping database"}
 psql $DB_NAME < /usr/libexec/p-vector/abbsdb.sql
 psql $DB_NAME < /usr/libexec/p-vector/vercomp.sql
+psql $DB_NAME < /usr/libexec/p-vector/foreignkey.sql
 ```
 
 ### YAML

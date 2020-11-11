@@ -116,33 +116,33 @@ def scan_dir(db, base_dir: str, branch: str, component: str, branch_idx: int):
     ignore_files = set()
     modified_repo = set()
     del_list = []
+    # For each package/version/architecture we already know in the DB:
     for package, version, repopath, architecture, filename, size, mtime, sha256 in cur:
         fullpath = PosixPath(base_dir).joinpath(filename)
         if fullpath.is_file():
+            # If a package with the same name exists:
             stat = fullpath.stat()
             sfullpath = str(fullpath)
             if size == stat.st_size and (mtime == int(stat.st_mtime) or
+                # Ignore if the file isn't changed
                 internal_pkgscan.sha256_file(sfullpath) == sha256):
                 ignore_files.add(sfullpath)
             else:
+                # Consider the new file to be a duplicate and replace the old one
                 dup_pkgs.add(filename)
                 del_list.append((filename, package, version, repopath))
         else:
+            # If the package has been deleted
             del_list.append((filename, package, version, repopath))
             logger_scan.info('CLEAN  %s', filename)
             module_ipc.publish_change(
                 compname, package, architecture, 'delete', version, '')
+    # For each package/version/arch/repo to be deleted:
     for row in del_list:
-        cur.execute("DELETE FROM pv_package_sodep "
-            "WHERE package=%s AND version=%s AND repo=%s", row[1:])
-        cur.execute("DELETE FROM pv_package_files "
-            "WHERE package=%s AND version=%s AND repo=%s", row[1:])
-        cur.execute("DELETE FROM pv_package_dependencies "
-            "WHERE package=%s AND version=%s AND repo=%s", row[1:])
         cur.execute("DELETE FROM pv_packages WHERE filename=%s", (row[0],))
-        cur.execute("DELETE FROM pv_package_duplicate WHERE filename=%s", (row[0],))
         modified_repo.add(row[1:][-1])
-    #check_list = [[] for _ in range(4)]
+    # Check if there are any new files added. Recursively scan the pool dir and take notes of
+    # what we haven't seen yet.
     check_list = []
     for fullpath in search_path.rglob('*.deb'):
         if not fullpath.is_file():
@@ -151,16 +151,11 @@ def scan_dir(db, base_dir: str, branch: str, component: str, branch_idx: int):
         sfullpath = str(fullpath)
         if sfullpath in ignore_files:
             continue
-        #check_list[0].append(sfullpath)
-        #check_list[1].append(str(fullpath.relative_to(base_dir)))
-        #check_list[2].append(stat.st_size)
-        #check_list[3].append(int(stat.st_mtime))
         check_list.append((sfullpath, str(fullpath.relative_to(base_dir)),
                            stat.st_size, int(stat.st_mtime)))
     del ignore_files
     with multiprocessing.dummy.Pool(max(1, os.cpu_count() - 1)) as mpool:
-        for pkginfo, depinfo, sodeps, files in mpool.imap_unordered(
-            scan_deb, check_list, 5):
+        for pkginfo, depinfo, sodeps, files in mpool.imap_unordered(scan_deb, check_list, 5):
             realname = pkginfo['architecture']
             validdeb = ('debtime' in pkginfo)
             if realname == 'all':
@@ -232,7 +227,10 @@ def scan_dir(db, base_dir: str, branch: str, component: str, branch_idx: int):
                 (keys, qms), vals)
             for row in depinfo.items():
                 cur.execute("INSERT INTO pv_package_dependencies "
-                    "VALUES (%s,%s,%s,%s,%s)", dbkey + row)
+                    "VALUES (%s,%s,%s,%s,%s) "
+                    "ON CONFLICT ON CONSTRAINT pv_package_dependencies_pkey "
+                    "DO UPDATE SET value = %s",
+                    dbkey + row + (row[1],))
             for row in sodeps:
                 cur.execute("INSERT INTO pv_package_sodep VALUES "
                     "(%s,%s,%s,%s,%s,%s)", dbkey + row)

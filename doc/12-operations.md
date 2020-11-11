@@ -18,6 +18,13 @@
 *`analyze`*
 :   Analyzes potential issues for the current repository and stores them in the database. In addition to directly querying the database, a set of utilities can be used to build a web frontend to the database. See [AOSC Wiki Page on the Packages Site](https://wiki.aosc.io/developer/infrastructure/packages-site/) for more information. An official instance to query main AOSC repository is currently hosted at <https://packages.aosc.io>.
 
+*`gc [--dry-run]`*
+:   Cleans up the database and removes branch-components (e.g. expired and merged topics) that no longer exist on the disk. This will delete:
+:    - database entries referencing missing branch-components,
+:    - database entries referencing a package contained in the missing branch-components and
+:    - APT assets for such branch-components from dists directory.
+:   The optional parameter *`--dry-run`* will cause `p-vector` to print missing branch-components only, making no changes to the dists directory and the database.
+
 *`reset table_category`*
 :   Drops data from the database.
 :   **WARNING: This operation may render `p-vector` inoperable if used incorrectly.**

@@ -7,7 +7,7 @@ author:
   - Tianhao Chai <cth451@gmail.com>
   - Dingyuan Wang <gumblex@aosc.io>
   - Lion Yang <lion@aosc.io>
-date: September 29, 2020
+date: Oct 28, 2020
 header-includes:
   - \hypersetup{colorlinks=true}
   - \usepackage{fontspec}
