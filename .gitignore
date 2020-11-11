@@ -3,6 +3,7 @@
 /build/
 /.*/
 !.github
+!.ci
 
 # Editor tempporaries
 *.swp
