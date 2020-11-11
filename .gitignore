@@ -2,6 +2,7 @@
 /cmake-build-debug/
 /build/
 /.*/
+!.github
 
 # Editor tempporaries
 *.swp
