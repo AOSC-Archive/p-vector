@@ -33,6 +33,7 @@ jobs:
         path: |
           build/*.tar*
           build/*.deb
+          build/*.sha256
 
 
   release:
@@ -58,4 +59,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          asset_paths: '["./**/*.tar.*","./**/*.deb"]'
+          asset_paths: '["./**/*.tar.*","./**/*.deb", "./**/*.sha256"]'
