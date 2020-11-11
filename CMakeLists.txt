@@ -14,6 +14,7 @@ install(PROGRAMS p-vector DESTINATION bin)
 
 # CPack settings
 set(CPACK_PACKAGE_VENDOR "AOSC")
+set(CPACK_PACKAGE_VERSION $ENV{PV_VERSION})
 set(CPACK_PACKAGE_DESCRIPTION "Scanner for .deb Packages and ELF Dependencies")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "AOSC")
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "libarchive13 libssl1.1 python3")
