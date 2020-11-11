@@ -20,7 +20,7 @@ jobs:
       shell: bash
       run: |
         apt-get update
-        apt-get install -y libarchive-dev libssl-dev cmake ninja-build build-essential
+        apt-get install -y libarchive-dev libssl-dev cmake ninja-build build-essential pandoc
     - name: Build
       shell: bash
       run: ./.ci/build.sh
