@@ -59,4 +59,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          asset_paths: '["./**/*.tar.*","./**/*.deb", "./**/*.sha256"]'
+          asset_paths: '["./**/*.tar.xz","./**/*.deb", "./**/*.sha256"]'
