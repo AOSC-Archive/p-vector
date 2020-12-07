@@ -22,7 +22,7 @@ jobs:
         apt-get update
         apt-get install -y libarchive-dev libssl-dev cmake ninja-build build-essential pandoc
     - name: Query tag name
-      uses: olegtarasov/get-tag@v2
+      uses: little-core-labs/get-git-tag@v3.0.2
     - name: Build
       shell: bash
       run: ./.ci/build.sh
@@ -43,7 +43,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v2
       - name: Query tag name
-        uses: olegtarasov/get-tag@v2
+        uses: little-core-labs/get-git-tag@v3.0.2
         id: tagName
       - name: Create release
         uses: actions/create-release@v1
