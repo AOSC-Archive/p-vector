@@ -13,14 +13,14 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: 'debian:10'
+    container: 'aosc/aosc-os-buildkit:latest'
     steps:
     - uses: actions/checkout@v2
     - name: Install Dependencies
       shell: bash
       run: |
         apt-get update
-        apt-get install -y libarchive-dev libssl-dev cmake ninja-build build-essential pandoc
+        apt-get install -y cmake ninja pandoc
     - name: Query tag name
       uses: little-core-labs/get-git-tag@v3.0.2
     - name: Build
