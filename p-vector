@@ -8,7 +8,7 @@ import yaml
 import psycopg2
 import psycopg2.extras
 
-sys.path.insert(0, os.path.normpath(os.path.dirname(__file__) + '/../libexec/p-vector'))
+sys.path.insert(0, os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + '/../libexec/p-vector'))
 import internal_db
 import module_ipc
 import module_scan
